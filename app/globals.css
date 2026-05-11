@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { -webkit-tap-highlight-color: transparent; }
+body { font-family: "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+input, select, textarea { font-size: 16px !important; /* prevents iOS zoom */ }
+
+.signature-canvas { border: 2px dashed #E0E0E0; border-radius: 12px; background: #FAFAFA; touch-action: none; }
+.signature-canvas.signed { border-color: #1B2A4A; border-style: solid; }
+
+@layer utilities {
+  .step-enter { animation: fadeInUp 0.25s ease-out; }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
