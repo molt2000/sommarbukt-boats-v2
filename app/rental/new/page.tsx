@@ -176,12 +176,18 @@ export default function RentalWizard() {
   };
 
   const complete = () => {
+  try {
     saveRental(rental);
     const doc = generateRentalPDF(rental, rentalTerms);
-    const blob = doc.output("blob");
+    const arrayBuffer = doc.output("arraybuffer");
+    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
     setPdfBlob(blob);
     setStep(6);
-  };
+  } catch (err) {
+    console.error("PDF generation failed:", err);
+    alert("Something went wrong. Please try again.");
+  }
+};
 
   const downloadPDF = () => {
     if (!pdfBlob) return;
