@@ -6,14 +6,16 @@ export async function POST(req: NextRequest) {
     const { to, subject, html, pdfBase64, pdfFilename } = await req.json();
 
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,          // e.g. smtps.udag.de (United Domains)
-      port: Number(process.env.SMTP_PORT) || 465,
-      secure: true,
-      auth: {
-        user: process.env.SMTP_USER,        // e.g. boats@sommarbukt.com
-        pass: process.env.SMTP_PASS,
-      },
-    });
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: false, // STARTTLS uses secure:false on 587
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+  requireTLS: true,
+});
+
 
     await transporter.sendMail({
       from: `"Sommarbukt Boats" <${process.env.SMTP_USER}>`,
