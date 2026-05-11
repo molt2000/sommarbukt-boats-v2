@@ -28,7 +28,7 @@ const FALLBACK_TERMS = `BOAT RENTAL AGREEMENT
 SOMMARBUKT BOAT RENTAL
 9030 Sjursnes, Troms, Norway
 
-═══════════════════════════════════════════════════
+
 
 1. PARTIES
 
@@ -37,13 +37,11 @@ Sommarbukt Boat Rental, 9030 Sjursnes, Troms, Norway
 
 Renter: As stated on ID provided at handover
 
-═══════════════════════════════════════════════════
 
 2. RENTAL OBJECT
 
 The boat is rented in the condition the renter has personally inspected and approved at handover. Any pre-existing damage has been noted in this agreement.
 
-═══════════════════════════════════════════════════
 
 3. RENTER'S RESPONSIBILITY
 
@@ -55,7 +53,6 @@ The boat is rented in the condition the renter has personally inspected and appr
 
 3.4 A boat licence is required where Norwegian law mandates it. The renter confirms compliance with all applicable licensing requirements.
 
-═══════════════════════════════════════════════════
 
 4. SAFETY
 
@@ -69,7 +66,6 @@ The boat is rented in the condition the renter has personally inspected and appr
 
 4.5 The boat must not be used in bad weather, strong winds (above Beaufort 5), or any conditions that pose a safety risk to those on board or others.
 
-═══════════════════════════════════════════════════
 
 5. DAMAGE AND LIABILITY
 
@@ -83,7 +79,6 @@ The boat is rented in the condition the renter has personally inspected and appr
 
 5.5 Sommarbukt is not liable for any personal injury, loss of personal belongings, or third-party damage arising during the rental period.
 
-═══════════════════════════════════════════════════
 
 6. RETURN
 
@@ -95,7 +90,6 @@ The boat is rented in the condition the renter has personally inspected and appr
 
 6.4 Late returns will be charged at the applicable hourly rate per commenced hour, without prior notice.
 
-═══════════════════════════════════════════════════
 
 7. CANCELLATION
 
@@ -107,7 +101,6 @@ The boat is rented in the condition the renter has personally inspected and appr
 
 7.4 Sommarbukt reserves the right to cancel any rental for safety reasons — including adverse weather or technical failure — without liability. A full refund will be issued in such cases.
 
-═══════════════════════════════════════════════════
 
 8. EMERGENCIES
 
@@ -118,19 +111,14 @@ In case of emergency at sea:
   Coast Guard VHF: Channel 16
   Sommarbukt: +47 968 514 64
 
-═══════════════════════════════════════════════════
 
 9. PRIVACY
 
 Personal data collected in connection with this agreement is processed in accordance with Norwegian privacy legislation (GDPR) and will not be retained longer than necessary for the purpose for which it was collected.
 
-═══════════════════════════════════════════════════
-
 10. DISPUTES
 
 Any disputes shall first be sought resolved amicably between the parties. If no resolution can be reached, the legal venue is Troms District Court, Norway.
-
-═══════════════════════════════════════════════════
 
 By signing below, the renter confirms having read, understood, and accepted all terms and conditions set out in this agreement.`;
 
