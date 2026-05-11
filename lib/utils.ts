@@ -9,14 +9,3 @@ export function formatDate(iso: string) {
     hour: "2-digit", minute: "2-digit",
   });
 }
-
-export function getGPS(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 5000 }
-    );
-  });
-}

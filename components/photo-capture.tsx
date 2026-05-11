@@ -1,7 +1,6 @@
 "use client";
 import { Camera, X, CheckCircle } from "lucide-react";
 import { PhotoEntry } from "@/lib/types";
-import { getGPS } from "@/lib/utils";
 import { useRef } from "react";
 
 interface Props {
@@ -26,13 +25,11 @@ export default function PhotoCapture({ labels, photos, onChange }: Props) {
 
     // Resize to max 1200px for storage efficiency
     const resized = await resizeImage(dataUrl, 1200);
-    const gps = await getGPS();
+
     const entry: PhotoEntry = {
       label: pendingLabel.current,
       dataUrl: resized,
       timestamp: new Date().toISOString(),
-      gpsLat: gps?.lat,
-      gpsLng: gps?.lng,
     };
 
     const updated = [...photos.filter(p => p.label !== entry.label), entry];
