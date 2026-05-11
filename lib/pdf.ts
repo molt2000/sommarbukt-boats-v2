@@ -104,21 +104,29 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   }
 
     // Terms & Conditions
-  if (terms) {
-    y = checkNewPage(doc, y, 20);
-    y += 4;
-    y = section(doc, "Terms & Conditions", y);
-    doc.setFontSize(7.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(60, 60, 60);
-    const termLines = doc.splitTextToSize(terms, 180);
-    for (const line of termLines) {
-      y = checkNewPage(doc, y, 5);
-      doc.text(line, 15, y);
-      y += 4;
-    }
+const cleanedTerms = (terms ?? "")
+  .replace(/\r\n/g, "\n")
+  .replace(/%P/g, "\n\n")
+  .replace(/\n{3,}/g, "\n\n")
+  .trim();
+
+if (cleanedTerms) {
+  y = checkNewPage(doc, y, 20);
+  y += 4;
+  y = section(doc, "Terms & Conditions", y);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(60, 60, 60);
+
+  const termLines = doc.splitTextToSize(cleanedTerms, 180);
+  for (const line of termLines) {
+    y = checkNewPage(doc, y, 5);
+    doc.text(line, 15, y);
     y += 4;
   }
+  y += 4;
+}
+
 
   
 
