@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getJsonItem, setJsonItem, setTextItem } from "@/lib/safe-storage";
+import { getErrorMessage } from "@/lib/utils";
 
 interface Boat {
   id: string;
@@ -126,8 +128,7 @@ By signing below, the renter confirms having read, understood, and accepted all 
 
 function loadBoats(): Boat[] {
   if (typeof window === "undefined") return DEFAULT_BOATS;
-  const raw = localStorage.getItem("sb_boats");
-  return raw ? JSON.parse(raw) : DEFAULT_BOATS;
+  return getJsonItem("sb_boats", DEFAULT_BOATS);
 }
 
 function loadTerms(): string {
@@ -148,15 +149,25 @@ export default function ConfigPage() {
   const [newReg, setNewReg] = useState("");
 
   useEffect(() => {
-    setBoats(loadBoats());
-    setTerms(loadTerms());
+    try {
+      setBoats(loadBoats());
+      setTerms(loadTerms());
+    } catch (error) {
+      alert(getErrorMessage(error));
+      setBoats(DEFAULT_BOATS);
+      setTerms(DEFAULT_TERMS);
+    }
   }, []);
 
   function save() {
-    localStorage.setItem("sb_boats", JSON.stringify(boats));
-    localStorage.setItem("sb_terms", terms);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      setJsonItem("sb_boats", boats);
+      setTextItem("sb_terms", terms);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      alert(getErrorMessage(error));
+    }
   }
 
   function addBoat() {

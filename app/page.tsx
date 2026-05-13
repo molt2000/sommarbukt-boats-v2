@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getRentals } from "@/lib/storage";
 import { Rental } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { formatDate, getErrorMessage } from "@/lib/utils";
 import Button from "@/components/ui/button";
 import { Plus, Ship, ArrowRight, Clock, CheckCircle2, Search, Settings } from "lucide-react";
 
@@ -12,7 +12,13 @@ export default function Dashboard() {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [search, setSearch] = useState("");
 
-  useEffect(() => { setRentals(getRentals()); }, []);
+  useEffect(() => {
+    try {
+      setRentals(getRentals());
+    } catch (error) {
+      alert(getErrorMessage(error));
+    }
+  }, []);
 
   const active = rentals.filter(r => r.status === "active");
   const completed = rentals.filter(r => r.status === "completed");

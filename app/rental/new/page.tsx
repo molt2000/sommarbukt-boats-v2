@@ -3,7 +3,8 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Rental, getBoats, getTerms, SAFETY_ITEMS, PHOTO_ANGLES, FUEL_LEVELS, newRental } from "@/lib/types";
 import { saveRental, getRentals } from "@/lib/storage";
-import { formatDate } from "@/lib/utils";
+import { blobToBase64, escapeHtml, formatDate, getErrorMessage, isValidEmail } from "@/lib/utils";
+import { readAndCompressImage } from "@/lib/image";
 import { generateRentalPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
@@ -133,25 +134,30 @@ export default function RentalWizard() {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
   useEffect(() => {
-  const allBoats = getBoats();
+  try {
+    const allBoats = getBoats();
 
-  // IMPORTANT: use the same storage source/key as the rest of the app
-  const storedRentals = getRentals();
+    // IMPORTANT: use the same storage source/key as the rest of the app
+    const storedRentals = getRentals();
 
-  const activeBoatIds = new Set(
-    storedRentals
-      .filter(r => String((r as any)?.status ?? "").toLowerCase() === "active")
-      .map(r => (r as any)?.boatId)
-      .filter(Boolean)
-  );
+    const activeBoatIds = new Set(
+      storedRentals
+        .filter(r => String((r as any)?.status ?? "").toLowerCase() === "active")
+        .map(r => (r as any)?.boatId)
+        .filter(Boolean)
+    );
 
-  const boatsWithAvailability = allBoats.map(b => ({
-    ...b,
-    available: !activeBoatIds.has(b.id),
-  }));
+    const boatsWithAvailability = allBoats.map(b => ({
+      ...b,
+      available: !activeBoatIds.has(b.id),
+    }));
 
-  setBoats(boatsWithAvailability);
-  setRentalTerms(getTerms() || FALLBACK_TERMS);
+    setBoats(boatsWithAvailability);
+    setRentalTerms(getTerms() || FALLBACK_TERMS);
+  } catch (error) {
+    alert(getErrorMessage(error));
+    setRentalTerms(FALLBACK_TERMS);
+  }
 }, []);
 
 
@@ -165,7 +171,7 @@ export default function RentalWizard() {
 
   const canNext = (): boolean => {
     switch (step) {
-      case 0: return !!(rental.guestName && rental.guestPhone && rental.idPhotoData);
+      case 0: return !!(rental.guestName && rental.guestPhone && isValidEmail(rental.guestEmail) && rental.idPhotoData);
       case 1: return !!(rental.boatId && rental.expectedReturn);
       case 2: return Object.values(rental.safetyChecklist).every(Boolean);
       case 3: return rental.checkoutPhotos.length >= 4;
@@ -184,8 +190,8 @@ export default function RentalWizard() {
     setPdfBlob(blob);
     setStep(6);
   } catch (err) {
-    console.error("PDF generation failed:", err);
-    alert("Something went wrong. Please try again.");
+    console.error("Could not complete rental:", err);
+    alert(getErrorMessage(err));
   }
 };
 
@@ -203,22 +209,25 @@ export default function RentalWizard() {
     if (!pdfBlob || !rental.guestEmail) return;
     setSending(true);
     try {
-      const buf = await pdfBlob.arrayBuffer();
-      const base64 = btoa(Array.from(new Uint8Array(buf)).map(b => String.fromCharCode(b)).join(''));
+      const base64 = await blobToBase64(pdfBlob);
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: rental.guestEmail,
-          subject: `Your Sommarbukt Boat Rental Agreement — ${rental.boatName}`,
-          html: `<p>Dear ${rental.guestName},</p><p>Thank you for renting with Sommarbukt. Please find your rental agreement attached.</p><p>Boat: ${rental.boatName}<br>Check-out: ${formatDate(rental.checkoutTime)}<br>Expected return: ${formatDate(rental.expectedReturn)}</p><p>Have a great time on the water!<br>Sommarbukt Team</p>`,
+          subject: `Sommarbukt Boat Rental Agreement - ${rental.boatName}`,
+          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Thank you for renting with Sommarbukt. Please find your rental agreement attached.</p><p>Boat: ${escapeHtml(rental.boatName)}<br>Check-out: ${escapeHtml(formatDate(rental.checkoutTime))}<br>Expected return: ${escapeHtml(formatDate(rental.expectedReturn))}</p><p>Have a great time on the water!<br>Sommarbukt Team</p>`,
           pdfBase64: base64,
           pdfFilename: `sommarbukt-rental-${rental.id.slice(0, 8)}.pdf`,
         }),
       });
-      if (res.ok) setSent(true); else throw new Error("Failed");
+      if (res.ok) setSent(true);
+      else {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Email could not be sent.");
+      }
     } catch (e) {
-      alert("Email could not be sent. You can still download the PDF and share it manually.");
+      alert(`${getErrorMessage(e)} You can still download the PDF and share it manually.`);
     }
     setSending(false);
   };
@@ -307,7 +316,7 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
             <span className="text-brand font-medium">Tap to photograph ID front</span>
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
               const file = e.target.files?.[0]; if (!file) return;
-              update({ idPhotoData: await readFile(file) });
+              update({ idPhotoData: await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 }) });
             }} />
           </label>
         )}
@@ -332,7 +341,7 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
             <span className="text-gray-500 font-medium">Tap to photograph ID back</span>
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
               const file = e.target.files?.[0]; if (!file) return;
-              update({ idPhotoDataBack: await readFile(file) });
+              update({ idPhotoDataBack: await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 }) });
             }} />
           </label>
         )}
@@ -346,8 +355,11 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
         <Field label="Phone *">
           <Input type="tel" value={rental.guestPhone} onChange={e => update({ guestPhone: e.target.value })} placeholder="+49..." />
         </Field>
-        <Field label="Email" optional>
+        <Field label="Email *">
           <Input type="email" value={rental.guestEmail} onChange={e => update({ guestEmail: e.target.value })} placeholder="guest@email.com" />
+          {rental.guestEmail && !isValidEmail(rental.guestEmail) && (
+            <p className="mt-1 text-xs text-red-500">Enter a valid guest email address.</p>
+          )}
         </Field>
       </div>
 
@@ -576,10 +588,3 @@ function StepDone({ rental, downloadPDF, sendEmail, sending, sent }: {
 }
 
 /* ─── Helpers ─── */
-function readFile(file: File): Promise<string> {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.readAsDataURL(file);
-  });
-}

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getRental, deleteRental } from "@/lib/storage";
 import { Rental } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { blobToBase64, escapeHtml, formatDate, getErrorMessage } from "@/lib/utils";
 import { generateRentalPDF, generateReturnPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
 import { ArrowLeft, Ship, User, Shield, Camera, CreditCard, FileSignature, Download, Send, CornerDownRight, Trash2 } from "lucide-react";
@@ -16,9 +16,14 @@ export default function RentalDetail() {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    const r = getRental(params.id as string);
-    if (!r) { router.push("/"); return; }
-    setRental(r);
+    try {
+      const r = getRental(params.id as string);
+      if (!r) { router.push("/"); return; }
+      setRental(r);
+    } catch (error) {
+      alert(getErrorMessage(error));
+      router.push("/");
+    }
   }, [params.id, router]);
 
   if (!rental) return null;
@@ -39,30 +44,39 @@ export default function RentalDetail() {
     try {
       const doc = type === "rental" ? generateRentalPDF(rental) : generateReturnPDF(rental);
       const blob = doc.output("blob");
-      const buf = await blob.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const base64 = await blobToBase64(blob);
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: rental.guestEmail,
           subject: type === "rental"
-            ? `Your Sommarbukt Boat Rental Agreement — ${rental.boatName}`
-            : `Your Sommarbukt Boat Return Report — ${rental.boatName}`,
-          html: `<p>Dear ${rental.guestName},</p><p>Please find your ${type === "rental" ? "rental agreement" : "return report"} attached.</p><p>Thank you for choosing Sommarbukt!<br>Sommarbukt Team</p>`,
+            ? `Sommarbukt Boat Rental Agreement - ${rental.boatName}`
+            : `Sommarbukt Boat Return Report - ${rental.boatName}`,
+          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Please find your ${type === "rental" ? "rental agreement" : "return report"} attached.</p><p>Thank you for choosing Sommarbukt!<br>Sommarbukt Team</p>`,
           pdfBase64: base64,
           pdfFilename: `sommarbukt-${type}-${rental.id.slice(0, 8)}.pdf`,
         }),
       });
-      if (res.ok) setSent(true); else throw new Error("Failed");
-    } catch { alert("Could not send email. Download the PDF and share manually."); }
+      if (res.ok) setSent(true);
+      else {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Email could not be sent.");
+      }
+    } catch (error) {
+      alert(`${getErrorMessage(error)} Download the PDF and share manually.`);
+    }
     setSending(false);
   };
 
   const handleDelete = () => {
     if (confirm("Delete this rental permanently?")) {
-      deleteRental(rental.id);
-      router.push("/");
+      try {
+        deleteRental(rental.id);
+        router.push("/");
+      } catch (error) {
+        alert(getErrorMessage(error));
+      }
     }
   };
 

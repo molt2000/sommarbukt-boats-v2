@@ -1,11 +1,26 @@
+import { getJsonItem, setJsonItem } from "./safe-storage";
 import { Rental } from "./types";
 
 const KEY = "sommarbukt-rentals";
 
 export function getRentals(): Rental[] {
   if (typeof window === "undefined") return [];
+
   const raw = localStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Stored rental data is not a list.");
+    }
+    return parsed;
+  } catch (error) {
+    console.error("Could not read rentals from localStorage:", error);
+    throw new Error(
+      "Stored rental data is damaged and could not be opened. Please export or inspect the browser data before continuing."
+    );
+  }
 }
 
 export function getRental(id: string): Rental | undefined {
@@ -43,11 +58,11 @@ export function saveRental(rental: Rental) {
   if (idx >= 0) all[idx] = rental;
   else all.unshift(rental);
 
-  localStorage.setItem(KEY, JSON.stringify(all));
+  setJsonItem(KEY, all);
 }
 
 export function deleteRental(id: string) {
   if (typeof window === "undefined") return;
   const all = getRentals().filter(r => r.id !== id);
-  localStorage.setItem(KEY, JSON.stringify(all));
+  setJsonItem(KEY, all);
 }

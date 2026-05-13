@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getRental, saveRental } from "@/lib/storage";
 import { Rental, PHOTO_ANGLES, FUEL_LEVELS } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { blobToBase64, escapeHtml, formatDate, getErrorMessage } from "@/lib/utils";
 import { generateReturnPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
@@ -23,9 +23,14 @@ export default function ReturnWizard() {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    const r = getRental(params.id as string);
-    if (!r || r.status !== "active") { router.push("/"); return; }
-    setRental(r);
+    try {
+      const r = getRental(params.id as string);
+      if (!r || r.status !== "active") { router.push("/"); return; }
+      setRental(r);
+    } catch (error) {
+      alert(getErrorMessage(error));
+      router.push("/");
+    }
   }, [params.id, router]);
 
   if (!rental) return null;
@@ -34,7 +39,7 @@ export default function ReturnWizard() {
 
   const canNext = (): boolean => {
     switch (step) {
-      case 0: return rental.checkinPhotos.length >= 4;
+      case 0: return rental.checkinPhotos.length >= 4 && !!rental.checkinFuel && !!rental.checkinCondition;
       case 1: return rental.depositReturned || !!rental.depositDeduction;
       default: return true;
     }
@@ -42,11 +47,15 @@ export default function ReturnWizard() {
 
   const complete = () => {
     const updated = { ...rental, status: "completed" as const, actualReturn: new Date().toISOString() };
-    saveRental(updated);
-    setRental(updated);
-    const doc = generateReturnPDF(updated);
-    setPdfBlob(doc.output("blob"));
-    setStep(2);
+    try {
+      saveRental(updated);
+      setRental(updated);
+      const doc = generateReturnPDF(updated);
+      setPdfBlob(doc.output("blob"));
+      setStep(2);
+    } catch (error) {
+      alert(getErrorMessage(error));
+    }
   };
 
   const downloadPDF = () => {
@@ -63,21 +72,26 @@ export default function ReturnWizard() {
     if (!pdfBlob || !rental.guestEmail) return;
     setSending(true);
     try {
-      const buf = await pdfBlob.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const base64 = await blobToBase64(pdfBlob);
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: rental.guestEmail,
-          subject: `Your Sommarbukt Boat Return Report — ${rental.boatName}`,
-          html: `<p>Dear ${rental.guestName},</p><p>Your boat has been returned. Please find the return report attached.</p><p>Thank you for choosing Sommarbukt!<br>Sommarbukt Team</p>`,
+          subject: `Sommarbukt Boat Return Report - ${rental.boatName}`,
+          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Your boat has been returned. Please find the return report attached.</p><p>Thank you for choosing Sommarbukt!<br>Sommarbukt Team</p>`,
           pdfBase64: base64,
           pdfFilename: `sommarbukt-return-${rental.id.slice(0, 8)}.pdf`,
         }),
       });
-      if (res.ok) setSent(true); else throw new Error("Failed");
-    } catch { alert("Could not send email."); }
+      if (res.ok) setSent(true);
+      else {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Email could not be sent.");
+      }
+    } catch (error) {
+      alert(getErrorMessage(error));
+    }
     setSending(false);
   };
 

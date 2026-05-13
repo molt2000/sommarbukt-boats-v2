@@ -33,7 +33,7 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   y = row(doc, "Nationality", rental.nationality, y);
   y = row(doc, "ID Number", rental.idNumber, y);
   y = row(doc, "Passengers", String(rental.passengerCount), y);
-  y = row(doc, "Boat Licence", rental.hasLicence ? `Yes — ${rental.licenceNumber}` : "No", y);
+  y = row(doc, "Boat Licence", rental.hasLicence ? `Yes - ${rental.licenceNumber}` : "No", y);
 
   y += 4;
   y = section(doc, "Rental Details", y);
@@ -48,7 +48,7 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   y += 4;
   y = section(doc, "Safety Checklist", y);
   Object.entries(rental.safetyChecklist).forEach(([item, checked]) => {
-    y = row(doc, checked ? "✓" : "✗", item, y);
+    y = row(doc, checked ? "Yes" : "No", item, y);
   });
 
   y += 4;
@@ -155,7 +155,7 @@ if (cleanedTerms) {
     doc.setPage(i);
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
-    doc.text("Sommarbukt · 9030 Sjursnes, Troms, Norway · sommarbukt.com", w / 2, 290, { align: "center" });
+    doc.text("Sommarbukt - 9030 Sjursnes, Troms, Norway - sommarbukt.com", w / 2, 290, { align: "center" });
   }
 
   return doc;
@@ -223,7 +223,7 @@ export function generateReturnPDF(rental: Rental): jsPDF {
     doc.setPage(i);
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
-    doc.text("Sommarbukt · 9030 Sjursnes, Troms, Norway · sommarbukt.com", w / 2, 290, { align: "center" });
+    doc.text("Sommarbukt - 9030 Sjursnes, Troms, Norway - sommarbukt.com", w / 2, 290, { align: "center" });
   }
 
   return doc;
@@ -248,7 +248,7 @@ function row(doc: jsPDF, label: string, value: string, y: number): number {
   doc.text(label, 15, y);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(30, 30, 30);
-  const lines = doc.splitTextToSize(value || "—", 120);
+  const lines = doc.splitTextToSize(value || "-", 120);
   doc.text(lines, 60, y);
   return y + Math.max(lines.length * 4.5, 6);
 }

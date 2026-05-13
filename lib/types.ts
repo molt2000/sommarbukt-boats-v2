@@ -1,3 +1,5 @@
+import { getJsonItem } from "./safe-storage";
+
 export interface Rental {
   id: string;
   createdAt: string;
@@ -10,7 +12,7 @@ export interface Rental {
   nationality: string;
   idNumber: string;
   idPhotoData: string; // base64
-  idPhotoDataBack: string; // base64 — back of ID card
+  idPhotoDataBack: string; // base64 - back of ID card
   passengerCount: number;
   hasLicence: boolean;
   licenceNumber: string;
@@ -69,17 +71,14 @@ export interface Boat {
   available: boolean;
 }
 
+const DEFAULT_BOATS: Boat[] = [
+  { id: "1", name: "Kaasboll 660 #1", available: true },
+  { id: "2", name: "Kaasboll 660 #2", available: true },
+];
+
 export function getBoats(): Boat[] {
-  if (typeof window === "undefined") return [
-    { id: "1", name: "Kaasboll 660 #1", available: true },
-    { id: "2", name: "Kaasboll 660 #2", available: true },
-  ];
-  const raw = localStorage.getItem("sb_boats");
-  if (!raw) return [
-    { id: "1", name: "Kaasboll 660 #1", available: true },
-    { id: "2", name: "Kaasboll 660 #2", available: true },
-  ];
-  return JSON.parse(raw).map((b: {id:string;name:string}) => ({ ...b, available: true }));
+  const boats = getJsonItem<{ id: string; name: string }[]>("sb_boats", DEFAULT_BOATS);
+  return boats.map(b => ({ ...b, available: true }));
 }
 
 export function getTerms(): string {

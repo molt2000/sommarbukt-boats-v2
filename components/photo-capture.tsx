@@ -1,6 +1,7 @@
 "use client";
 import { Camera, X, CheckCircle } from "lucide-react";
 import { PhotoEntry } from "@/lib/types";
+import { readAndCompressImage } from "@/lib/image";
 import { useRef } from "react";
 
 interface Props {
@@ -17,14 +18,7 @@ export default function PhotoCapture({ labels, photos, onChange }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const dataUrl = await new Promise<string>(resolve => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-
-    // Resize to max 1200px for storage efficiency
-    const resized = await resizeImage(dataUrl, 1200);
+    const resized = await readAndCompressImage(file, { maxSize: 1200, quality: 0.78 });
 
     const entry: PhotoEntry = {
       label: pendingLabel.current,
@@ -82,24 +76,4 @@ export default function PhotoCapture({ labels, photos, onChange }: Props) {
       </div>
     </div>
   );
-}
-
-function resizeImage(dataUrl: string, maxSize: number): Promise<string> {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      let { width, height } = img;
-      if (width > maxSize || height > maxSize) {
-        const ratio = Math.min(maxSize / width, maxSize / height);
-        width *= ratio;
-        height *= ratio;
-      }
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", 0.8));
-    };
-    img.src = dataUrl;
-  });
 }
