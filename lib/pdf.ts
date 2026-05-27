@@ -33,14 +33,14 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   y = row(doc, "Nationality", rental.nationality, y);
   y = row(doc, "ID Number", rental.idNumber, y);
   y = row(doc, "Passengers", String(rental.passengerCount), y);
-  y = row(doc, "Boat Licence", rental.hasLicence ? `Yes - ${rental.licenceNumber}` : "No", y);
+  y = row(doc, "Boat Licence", rental.licenceNumber || "None", y);
+  y = row(doc, "Born before 1980", rental.bornBefore1980 ? "Yes" : "No", y);
 
   y += 4;
   y = section(doc, "Rental Details", y);
   y = row(doc, "Boat", rental.boatName, y);
-  y = row(doc, "Type", rental.rentalType, y);
-  y = row(doc, "Check-out", formatDate(rental.checkoutTime), y);
-  y = row(doc, "Expected Return", formatDate(rental.expectedReturn), y);
+  y = row(doc, "Hand-Over", formatDate(rental.checkoutDate), y);
+  y = row(doc, "Return Date", formatDate(rental.returnDate), y);
   y = row(doc, "Fuel Level", rental.checkoutFuel, y);
   y = row(doc, "Condition", rental.checkoutCondition, y);
   if (rental.checkoutDamageNotes) y = row(doc, "Notes", rental.checkoutDamageNotes, y);
@@ -52,11 +52,11 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   });
 
   y += 4;
-  y = section(doc, "Payment", y);
-  y = row(doc, "Rental Fee", rental.rentalFee, y);
+  y = section(doc, "Deposit", y);
+  if (rental.rentalFee) {
+    y = row(doc, "Rental Fee", rental.rentalFee, y);
+  }
   y = row(doc, "Deposit", rental.depositAmount, y);
-  y = row(doc, "Method", rental.paymentMethod, y);
-  y = row(doc, "Payment Received", rental.paymentReceived ? "Yes" : "No", y);
   y = row(doc, "Deposit Received", rental.depositReceived ? "Yes" : "No", y);
 
     // ID photo
@@ -82,11 +82,11 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   }
 
 
-  // Check-out photos
+  // Hand-Over photos
   if (rental.checkoutPhotos.length > 0) {
     y = checkNewPage(doc, y, 60);
     y += 4;
-    y = section(doc, "Check-Out Photos", y);
+    y = section(doc, "Hand-Over Photos", y);
     let col = 0;
     for (const photo of rental.checkoutPhotos) {
       y = checkNewPage(doc, y, 50);
@@ -128,7 +128,7 @@ if (cleanedTerms) {
 }
 
 
-  
+
 
   // Signature
   y = checkNewPage(doc, y, 50);
@@ -184,7 +184,7 @@ export function generateReturnPDF(rental: Rental): jsPDF {
   y = section(doc, "Rental Reference", y);
   y = row(doc, "Guest", rental.guestName, y);
   y = row(doc, "Boat", rental.boatName, y);
-  y = row(doc, "Check-out", formatDate(rental.checkoutTime), y);
+  y = row(doc, "Hand-Over", formatDate(rental.checkoutDate), y);
   y = row(doc, "Returned", formatDate(rental.actualReturn), y);
 
   y += 4;

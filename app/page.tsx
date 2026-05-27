@@ -124,7 +124,7 @@ function RentalCard({ rental, onClick, compact }: { rental: Rental; onClick: () 
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-medium truncate">{rental.guestName || "Unnamed"}</div>
-        {!compact && <div className="text-sm text-gray-500">{rental.boatName} · Return: {formatDate(rental.expectedReturn)}</div>}
+        {!compact && <div className="text-sm text-gray-500">{rental.boatName} · Return: {formatDate(rental.returnDate)}</div>}
         {compact && <div className="text-sm text-gray-400">{rental.boatName} · {formatDate(rental.createdAt)}</div>}
       </div>
       <div className="flex items-center gap-2">

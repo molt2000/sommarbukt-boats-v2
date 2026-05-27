@@ -17,13 +17,13 @@ export interface Rental {
   hasLicence: boolean;
   licenceNumber: string;
   licencePhotoData: string; // base64
+  bornBefore1980: boolean;
 
   // Rental
   boatId: string;
   boatName: string;
-  rentalType: "half-day" | "full-day" | "multi-day";
-  checkoutTime: string;
-  expectedReturn: string;
+  checkoutDate: string;
+  returnDate: string;
   actualReturn: string;
 
   // Safety
@@ -45,16 +45,12 @@ export interface Rental {
   // Payment
   rentalFee: string;
   depositAmount: string;
-  paymentReceived: boolean;
   depositReceived: boolean;
-  paymentMethod: string;
   depositReturned: boolean;
   depositDeduction: string;
 
   // Signature
   signatureData: string; // base64
-  termsAccepted: boolean;
-  safetyBriefingDone: boolean;
 }
 
 export interface PhotoEntry {
@@ -68,17 +64,17 @@ export interface PhotoEntry {
 export interface Boat {
   id: string;
   name: string;
-  available: boolean;
+  available?: boolean;
 }
 
 const DEFAULT_BOATS: Boat[] = [
-  { id: "1", name: "Kaasboll 660 #1", available: true },
-  { id: "2", name: "Kaasboll 660 #2", available: true },
+  { id: "1", name: "Tind", available: true },
+  { id: "2", name: "Nordlys", available: true },
 ];
 
 export function getBoats(): Boat[] {
   const boats = getJsonItem<{ id: string; name: string }[]>("sb_boats", DEFAULT_BOATS);
-  return boats.map(b => ({ ...b, available: true }));
+  return boats;
 }
 
 export function getTerms(): string {
@@ -87,14 +83,12 @@ export function getTerms(): string {
 }
 
 export const SAFETY_ITEMS = [
-  "Life jackets (correct count)",
-  "Navigation lights working",
-  "Horn / whistle present",
+  "Life jackets (6 on board)",
   "Anchor and rope present",
-  "Emergency kit on board",
   "Fire extinguisher",
   "First aid kit",
   "Weather advisory acknowledged",
+  "Key handed over",
 ];
 
 export const PHOTO_ANGLES = [
@@ -115,13 +109,14 @@ export function newRental(): Rental {
     status: "active",
     guestName: "", guestPhone: "", guestEmail: "", nationality: "", idNumber: "",
     idPhotoData: "", idPhotoDataBack: "", passengerCount: 1, hasLicence: false, licenceNumber: "", licencePhotoData: "",
-    boatId: "", boatName: "", rentalType: "full-day",
-    checkoutTime: new Date().toISOString().slice(0, 16), expectedReturn: "", actualReturn: "",
+    bornBefore1980: false,
+    boatId: "", boatName: "",
+    checkoutDate: new Date().toISOString().slice(0, 16), returnDate: "", actualReturn: "",
     safetyChecklist: Object.fromEntries(SAFETY_ITEMS.map(i => [i, false])),
     checkoutPhotos: [], checkoutFuel: "Full", checkoutCondition: "Good", checkoutDamageNotes: "",
     checkinPhotos: [], checkinFuel: "", checkinCondition: "", checkinDamageNotes: "", damageFound: false,
-    rentalFee: "", depositAmount: "", paymentReceived: false, depositReceived: false, paymentMethod: "Cash",
+    rentalFee: "", depositAmount: "", depositReceived: false,
     depositReturned: false, depositDeduction: "",
-    signatureData: "", termsAccepted: false, safetyBriefingDone: false,
+    signatureData: "",
   };
 }

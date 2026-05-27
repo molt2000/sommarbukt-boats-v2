@@ -18,10 +18,10 @@ import { ArrowLeft, ArrowRight, User, Ship, Shield, Camera, CreditCard, FileSign
 const STEPS = [
   { title: "Guest", icon: User },
   { title: "Rental", icon: Ship },
-  { title: "Safety", icon: Shield },
-  { title: "Photos", icon: Camera },
-  { title: "Payment", icon: CreditCard },
-  { title: "Sign", icon: FileSignature },
+  { title: "Safety Check", icon: Shield },
+  { title: "Boat Photos", icon: Camera },
+  { title: "Deposit", icon: CreditCard },
+  { title: "Signature", icon: FileSignature },
   { title: "Done", icon: Check },
 ];
 
@@ -137,7 +137,6 @@ export default function RentalWizard() {
   try {
     const allBoats = getBoats();
 
-    // IMPORTANT: use the same storage source/key as the rest of the app
     const storedRentals = getRentals();
 
     const activeBoatIds = new Set(
@@ -171,12 +170,12 @@ export default function RentalWizard() {
 
   const canNext = (): boolean => {
     switch (step) {
-      case 0: return !!(rental.guestName && rental.guestPhone && isValidEmail(rental.guestEmail) && rental.idPhotoData);
-      case 1: return !!(rental.boatId && rental.expectedReturn);
-      case 2: return Object.values(rental.safetyChecklist).every(Boolean);
+      case 0: return !!(rental.guestName && rental.guestPhone && isValidEmail(rental.guestEmail) && rental.idPhotoData && (rental.bornBefore1980 || rental.licenceNumber));
+      case 1: return !!(rental.boatId && rental.returnDate);
+      case 2: return true;
       case 3: return rental.checkoutPhotos.length >= 4;
-      case 4: return rental.paymentReceived && rental.depositReceived;
-      case 5: return rental.termsAccepted && rental.safetyBriefingDone && !!rental.signatureData;
+      case 4: return true;
+      case 5: return !!rental.signatureData;
       default: return true;
     }
   };
@@ -200,7 +199,7 @@ export default function RentalWizard() {
     const url = URL.createObjectURL(pdfBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sommarbukt-rental-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`;
+    a.download = `sommarbukt-handover-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -216,9 +215,9 @@ export default function RentalWizard() {
         body: JSON.stringify({
           to: rental.guestEmail,
           subject: `Sommarbukt Boat Rental Agreement - ${rental.boatName}`,
-          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Thank you for renting with Sommarbukt. Please find your rental agreement attached.</p><p>Boat: ${escapeHtml(rental.boatName)}<br>Check-out: ${escapeHtml(formatDate(rental.checkoutTime))}<br>Expected return: ${escapeHtml(formatDate(rental.expectedReturn))}</p><p>Have a great time on the water!<br>Sommarbukt Team</p>`,
+          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Thank you for renting with Sommarbukt. Please find your rental agreement attached.</p><p>Boat: ${escapeHtml(rental.boatName)}<br>Hand-Over: ${escapeHtml(formatDate(rental.checkoutDate))}<br>Return Date: ${escapeHtml(formatDate(rental.returnDate))}</p><p>Have a great time on the water!<br>Sommarbukt Team</p>`,
           pdfBase64: base64,
-          pdfFilename: `sommarbukt-rental-${rental.id.slice(0, 8)}.pdf`,
+          pdfFilename: `sommarbukt-handover-${rental.id.slice(0, 8)}.pdf`,
         }),
       });
       if (res.ok) setSent(true);
@@ -376,16 +375,28 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
         <div className="flex items-center gap-4">
           <button className="w-12 h-12 rounded-xl border border-gray-200 text-xl font-bold hover:bg-gray-100 transition" onClick={() => update({ passengerCount: Math.max(1, rental.passengerCount - 1) })}>−</button>
           <span className="text-2xl font-bold w-10 text-center">{rental.passengerCount}</span>
-          <button className="w-12 h-12 rounded-xl border border-gray-200 text-xl font-bold hover:bg-gray-100 transition" onClick={() => update({ passengerCount: Math.min(8, rental.passengerCount + 1) })}>+</button>
+          <button className="w-12 h-12 rounded-xl border border-gray-200 text-xl font-bold hover:bg-gray-100 transition" onClick={() => update({ passengerCount: Math.min(4, rental.passengerCount + 1) })}>+</button>
         </div>
       </Field>
 
-      <Checkbox checked={rental.hasLicence} onChange={v => update({ hasLicence: v })} label="Has boat licence" />
+      <Checkbox
+        checked={rental.bornBefore1980}
+        onChange={v => update({ bornBefore1980: v })}
+        label="Born before 1980 (no licence required under Norwegian law)"
+      />
 
-      {rental.hasLicence && (
-        <Field label="Licence Number">
-          <Input value={rental.licenceNumber} onChange={e => update({ licenceNumber: e.target.value })} placeholder="Licence no." />
-        </Field>
+      <Field label="Boat Licence & Open Sea">
+        <Input
+          value={rental.licenceNumber}
+          onChange={e => update({ licenceNumber: e.target.value, hasLicence: e.target.value.length > 0 })}
+          placeholder="Licence number (leave blank if none)"
+        />
+      </Field>
+
+      {!rental.bornBefore1980 && !rental.licenceNumber && (
+        <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+          Either tick "Born before 1980" or enter a boat licence number to continue.
+        </p>
       )}
     </div>
   );
@@ -410,12 +421,12 @@ function StepRental({ rental, update, boats }: { rental: Rental; update: (p: Par
         </Select>
       </Field>
 
-      <Field label="Check-out Date & Time">
-        <Input type="datetime-local" value={rental.checkoutTime} onChange={e => update({ checkoutTime: e.target.value })} />
+      <Field label="Hand-Over Date & Time">
+        <Input type="datetime-local" value={rental.checkoutDate} onChange={e => update({ checkoutDate: e.target.value })} />
       </Field>
 
-      <Field label="Expected Return *">
-        <Input type="datetime-local" value={rental.expectedReturn} onChange={e => update({ expectedReturn: e.target.value })} />
+      <Field label="Return Date *">
+        <Input type="datetime-local" value={rental.returnDate} onChange={e => update({ returnDate: e.target.value })} />
       </Field>
     </div>
   );
@@ -425,9 +436,9 @@ function StepSafety({ rental, updateChecklist }: { rental: Rental; updateCheckli
   const allChecked = Object.values(rental.safetyChecklist).every(Boolean);
   return (
     <div className="space-y-2 pb-24">
-      <p className="text-sm text-gray-500 mb-4">Check each item with the guest before departure. All items are required.</p>
+      <p className="text-sm text-gray-500 mb-4">Check each item with the guest before departure.</p>
       {SAFETY_ITEMS.map(item => (
-        <Checkbox key={item} checked={rental.safetyChecklist[item] || false} onChange={v => updateChecklist(item, v)} label={item} required />
+        <Checkbox key={item} checked={rental.safetyChecklist[item] || false} onChange={v => updateChecklist(item, v)} label={item} />
       ))}
       {allChecked && (
         <div className="mt-4 p-3 rounded-xl bg-green-50 text-green-700 text-sm font-medium text-center">✓ All safety items confirmed</div>
@@ -479,29 +490,22 @@ function StepPhotos({ rental, update }: { rental: Rental; update: (p: Partial<Re
 function StepPayment({ rental, update }: { rental: Rental; update: (p: Partial<Rental>) => void }) {
   return (
     <div className="space-y-5 pb-24">
-      <p className="text-sm text-gray-500">Confirm that payment and deposit have been received. Both must be checked to proceed.</p>
+      <p className="text-sm text-gray-500">Record the rental fee and confirm the security deposit has been received.</p>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Rental Fee">
-          <Input value={rental.rentalFee} onChange={e => update({ rentalFee: e.target.value })} placeholder="e.g. 3100 NOK" />
-        </Field>
-        <Field label="Deposit Amount">
-          <Input value={rental.depositAmount} onChange={e => update({ depositAmount: e.target.value })} placeholder="e.g. 5000 NOK" />
-        </Field>
-      </div>
+      <Field label="Rental Fee" optional>
+        <Input value={rental.rentalFee} onChange={e => update({ rentalFee: e.target.value })} placeholder="e.g. 3100 NOK" />
+      </Field>
 
-      <Field label="Payment Method">
-        <Select value={rental.paymentMethod} onChange={e => update({ paymentMethod: e.target.value })}>
-          <option value="Cash">Cash</option>
-          <option value="Card">Card</option>
-          <option value="Vipps">Vipps</option>
-          <option value="Transfer">Bank Transfer</option>
+      <Field label="Security Deposit">
+        <Select value={rental.depositAmount} onChange={e => update({ depositAmount: e.target.value })}>
+          <option value="">Select deposit amount...</option>
+          <option value="5000 NOK">5 000 NOK</option>
+          <option value="10000 NOK">10 000 NOK</option>
         </Select>
       </Field>
 
       <div className="space-y-1 mt-4 p-4 bg-gray-50 rounded-xl">
-        <Checkbox checked={rental.paymentReceived} onChange={v => update({ paymentReceived: v })} label="Payment received" required />
-        <Checkbox checked={rental.depositReceived} onChange={v => update({ depositReceived: v })} label="Security deposit received" required />
+        <Checkbox checked={rental.depositReceived} onChange={v => update({ depositReceived: v })} label="Security deposit received" />
       </div>
     </div>
   );
@@ -526,9 +530,6 @@ function StepSign({ rental, update, terms }: { rental: Rental; update: (p: Parti
           {terms || FALLBACK_TERMS}
         </div>
       </div>
-
-      <Checkbox checked={rental.termsAccepted} onChange={v => update({ termsAccepted: v })} label="Guest has read and accepts the terms" required />
-      <Checkbox checked={rental.safetyBriefingDone} onChange={v => update({ safetyBriefingDone: v })} label="Safety briefing completed" required />
 
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-2">Guest Signature *</label>
@@ -570,7 +571,7 @@ function StepDone({ rental, downloadPDF, sendEmail, sending, sent }: {
 
       <div className="space-y-3 max-w-sm mx-auto">
         <Button size="lg" onClick={downloadPDF}>
-          <Download className="w-5 h-5 mr-2" /> Download PDF
+          <Download className="w-5 h-5 mr-2" /> Download Hand-Over PDF
         </Button>
 
         {rental.guestEmail && (

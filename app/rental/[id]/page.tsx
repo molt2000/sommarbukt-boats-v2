@@ -30,12 +30,12 @@ export default function RentalDetail() {
 
   const downloadRentalPDF = () => {
     const doc = generateRentalPDF(rental);
-    doc.save(`rental-${rental.guestName.replace(/\s+/g, "-")}-${rental.id.slice(0, 8)}.pdf`);
+    doc.save(`sommarbukt-handover-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`);
   };
 
   const downloadReturnPDF = () => {
     const doc = generateReturnPDF(rental);
-    doc.save(`return-${rental.guestName.replace(/\s+/g, "-")}-${rental.id.slice(0, 8)}.pdf`);
+    doc.save(`sommarbukt-return-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`);
   };
 
   const sendPDF = async (type: "rental" | "return") => {
@@ -100,15 +100,15 @@ export default function RentalDetail() {
         <Row label="Nationality" value={rental.nationality} />
         <Row label="ID" value={rental.idNumber} />
         <Row label="Passengers" value={String(rental.passengerCount)} />
-        <Row label="Licence" value={rental.hasLicence ? rental.licenceNumber || "Yes" : "No"} />
+        <Row label="Licence" value={rental.licenceNumber || "None"} />
+        <Row label="Born before 1980" value={rental.bornBefore1980 ? "Yes" : "No"} />
         {rental.idPhotoData && <img src={rental.idPhotoData} alt="ID" className="mt-3 rounded-lg w-full max-w-xs" />}
       </Card>
 
       <Card icon={<Ship className="w-5 h-5" />} title="Rental">
         <Row label="Boat" value={rental.boatName} />
-        <Row label="Type" value={rental.rentalType} />
-        <Row label="Out" value={formatDate(rental.checkoutTime)} />
-        <Row label="Expected" value={formatDate(rental.expectedReturn)} />
+        <Row label="Hand-Over" value={formatDate(rental.checkoutDate)} />
+        <Row label="Return Date" value={formatDate(rental.returnDate)} />
         {rental.actualReturn && <Row label="Returned" value={formatDate(rental.actualReturn)} />}
       </Card>
 
@@ -121,7 +121,7 @@ export default function RentalDetail() {
         ))}
       </Card>
 
-      <Card icon={<Camera className="w-5 h-5" />} title="Check-Out Photos">
+      <Card icon={<Camera className="w-5 h-5" />} title="Hand-Over Photos">
         <Row label="Fuel" value={rental.checkoutFuel} />
         <Row label="Condition" value={rental.checkoutCondition} />
         {rental.checkoutDamageNotes && <Row label="Notes" value={rental.checkoutDamageNotes} />}
@@ -135,11 +135,9 @@ export default function RentalDetail() {
         </div>
       </Card>
 
-      <Card icon={<CreditCard className="w-5 h-5" />} title="Payment">
-        <Row label="Fee" value={rental.rentalFee} />
+      <Card icon={<CreditCard className="w-5 h-5" />} title="Deposit">
+        {rental.rentalFee ? <Row label="Fee" value={rental.rentalFee} /> : null}
         <Row label="Deposit" value={rental.depositAmount} />
-        <Row label="Method" value={rental.paymentMethod} />
-        <Row label="Paid" value={rental.paymentReceived ? "✓ Yes" : "✗ No"} />
         <Row label="Deposit held" value={rental.depositReceived ? "✓ Yes" : "✗ No"} />
         {rental.status === "completed" && <Row label="Deposit returned" value={rental.depositReturned ? "✓ Yes" : "✗ No"} />}
       </Card>
@@ -176,12 +174,12 @@ export default function RentalDetail() {
         )}
 
         <Button size="lg" variant="secondary" onClick={downloadRentalPDF}>
-          <Download className="w-5 h-5 mr-2" /> Download Rental PDF
+          <Download className="w-5 h-5 mr-2" /> Download Hand-Over PDF
         </Button>
 
         {rental.status === "completed" && (
           <Button size="lg" variant="secondary" onClick={downloadReturnPDF}>
-            <Download className="w-5 h-5 mr-2" /> Download Return PDF
+            <Download className="w-5 h-5 mr-2" /> Download Return Report PDF
           </Button>
         )}
 
