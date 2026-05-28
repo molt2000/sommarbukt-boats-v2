@@ -46,12 +46,13 @@ export default function ReturnWizard() {
   };
 
   const complete = () => {
-    const updated = { ...rental, status: "completed" as const, actualReturn: new Date().toISOString() };
     try {
+      const updated = { ...rental, status: "completed" as const, actualReturn: new Date().toISOString() };
+      const doc = generateReturnPDF(updated);
+      const blob = doc.output("blob");
       saveRental(updated);
       setRental(updated);
-      const doc = generateReturnPDF(updated);
-      setPdfBlob(doc.output("blob"));
+      setPdfBlob(blob);
       setStep(2);
     } catch (error) {
       alert(getErrorMessage(error));
@@ -65,7 +66,7 @@ export default function ReturnWizard() {
     a.href = url;
     a.download = `return-${rental.guestName.replace(/\s+/g, "-")}-${rental.id.slice(0, 8)}.pdf`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const sendEmail = async () => {
@@ -98,7 +99,7 @@ export default function ReturnWizard() {
   return (
     <div className="py-6">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => step === 0 ? router.back() : setStep(s => s - 1)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center">
+        <button onClick={() => step === 0 ? router.back() : step === 2 ? router.push(`/rental/${params.id}`) : setStep(s => s - 1)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>

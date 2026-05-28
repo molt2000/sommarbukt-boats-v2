@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Rental, getBoats, getTerms, SAFETY_ITEMS, PHOTO_ANGLES, FUEL_LEVELS, newRental } from "@/lib/types";
+import { Rental, getBoats, RENTAL_TERMS, SAFETY_ITEMS, PHOTO_ANGLES, FUEL_LEVELS, newRental } from "@/lib/types";
 import { saveRental, getRentals } from "@/lib/storage";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage, isValidEmail } from "@/lib/utils";
 import { readAndCompressImage } from "@/lib/image";
@@ -25,103 +25,6 @@ const STEPS = [
   { title: "Done", icon: Check },
 ];
 
-const FALLBACK_TERMS = `BOAT RENTAL AGREEMENT
-SOMMARBUKT BOAT RENTAL
-9030 Sjursnes, Troms, Norway
-
-
-
-1. PARTIES
-
-Lessor:
-Sommarbukt Boat Rental, 9030 Sjursnes, Troms, Norway
-
-Renter: As stated on ID provided at handover
-
-
-2. RENTAL OBJECT
-
-The boat is rented in the condition the renter has personally inspected and approved at handover. Any pre-existing damage has been noted in this agreement.
-
-
-3. RENTER'S RESPONSIBILITY
-
-3.1 The renter is fully responsible for the boat, all equipment on board, and all persons on board from the moment of handover until the boat is returned to Sommarbukt.
-
-3.2 The renter shall operate the boat carefully and in accordance with all applicable maritime laws and regulations.
-
-3.3 The renter confirms having sufficient experience and knowledge to operate the boat safely and responsibly.
-
-3.4 A boat licence is required where Norwegian law mandates it. The renter confirms compliance with all applicable licensing requirements.
-
-
-4. SAFETY
-
-4.1 Life jackets must be worn by all persons on board at all times when on open water.
-
-4.2 Operating the boat under the influence of alcohol or drugs is strictly prohibited and will result in immediate termination of this agreement without refund.
-
-4.3 Speed limits in harbours, near shore, and in all regulated zones must be observed at all times.
-
-4.4 The maximum passenger capacity as indicated on the boat must never be exceeded.
-
-4.5 The boat must not be used in bad weather, strong winds (above Beaufort 5), or any conditions that pose a safety risk to those on board or others.
-
-
-5. DAMAGE AND LIABILITY
-
-5.1 The renter is fully financially responsible for all damage caused to the boat or its equipment during the rental period, except for documented technical defects that were present and noted at handover.
-
-5.2 Any damage must be reported to Sommarbukt immediately. Failure to report damage may result in extended liability.
-
-5.3 The security deposit is retained until the boat has been returned and inspected. In the event of damage, the deposit may be used to cover repair costs.
-
-5.4 If the cost of repair exceeds the deposit amount, the renter is liable for the full outstanding amount.
-
-5.5 Sommarbukt is not liable for any personal injury, loss of personal belongings, or third-party damage arising during the rental period.
-
-
-6. RETURN
-
-6.1 The boat must be returned to Sommarbukt at the agreed time and location.
-
-6.2 The boat must be returned with a full fuel tank unless otherwise agreed in writing at the time of handover.
-
-6.3 The boat must be returned in the same condition as at handover — clean and with all equipment on board.
-
-6.4 Late returns will be charged at the applicable hourly rate per commenced hour, without prior notice.
-
-
-7. CANCELLATION
-
-7.1 Cancellation more than 48 hours before departure: Full refund of rental fee. Deposit returned in full.
-
-7.2 Cancellation between 24 and 48 hours before departure: 50% refund of rental fee. Deposit returned in full.
-
-7.3 Cancellation less than 24 hours before departure or no-show: No refund. Deposit returned in full.
-
-7.4 Sommarbukt reserves the right to cancel any rental for safety reasons — including adverse weather or technical failure — without liability. A full refund will be issued in such cases.
-
-
-8. EMERGENCIES
-
-In case of emergency at sea:
-
-  Emergency Services: 112
-  Sea Rescue (Redningsselskapet): 02016
-  Coast Guard VHF: Channel 16
-  Sommarbukt: +47 968 514 64
-
-
-9. PRIVACY
-
-Personal data collected in connection with this agreement is processed in accordance with Norwegian privacy legislation (GDPR) and will not be retained longer than necessary for the purpose for which it was collected.
-
-10. DISPUTES
-
-Any disputes shall first be sought resolved amicably between the parties. If no resolution can be reached, the legal venue is Troms District Court, Norway.
-
-By signing below, the renter confirms having read, understood, and accepted all terms and conditions set out in this agreement.`;
 
 export default function RentalWizard() {
   const router = useRouter();
@@ -152,10 +55,10 @@ export default function RentalWizard() {
     }));
 
     setBoats(boatsWithAvailability);
-    setRentalTerms(getTerms() || FALLBACK_TERMS);
+    setRentalTerms(RENTAL_TERMS);
   } catch (error) {
     alert(getErrorMessage(error));
-    setRentalTerms(FALLBACK_TERMS);
+    setRentalTerms(RENTAL_TERMS);
   }
 }, []);
 
@@ -171,7 +74,7 @@ export default function RentalWizard() {
   const canNext = (): boolean => {
     switch (step) {
       case 0: return !!(rental.guestName && rental.guestPhone && isValidEmail(rental.guestEmail) && rental.idPhotoData && (rental.bornBefore1980 || rental.licenceNumber));
-      case 1: return !!(rental.boatId && rental.returnDate);
+      case 1: return !!(rental.boatId && rental.returnDate && rental.returnDate > rental.checkoutDate);
       case 2: return true;
       case 3: return rental.checkoutPhotos.length >= 4;
       case 4: return true;
@@ -182,10 +85,10 @@ export default function RentalWizard() {
 
   const complete = () => {
   try {
-    saveRental(rental);
     const doc = generateRentalPDF(rental, rentalTerms);
     const arrayBuffer = doc.output("arraybuffer");
     const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+    saveRental(rental);
     setPdfBlob(blob);
     setStep(6);
   } catch (err) {
@@ -201,7 +104,7 @@ export default function RentalWizard() {
     a.href = url;
     a.download = `sommarbukt-handover-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const sendEmail = async () => {
@@ -527,7 +430,7 @@ function StepSign({ rental, update, terms }: { rental: Rental; update: (p: Parti
           </button>
         </div>
         <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-line">
-          {terms || FALLBACK_TERMS}
+          {terms}
         </div>
       </div>
 
@@ -548,7 +451,7 @@ function StepSign({ rental, update, terms }: { rental: Rental; update: (p: Parti
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-5 text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-            {terms || FALLBACK_TERMS}
+            {terms}
           </div>
         </div>
       )}

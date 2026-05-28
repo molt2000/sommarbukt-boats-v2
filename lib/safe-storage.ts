@@ -17,6 +17,7 @@ export function getJsonItem<T>(key: string, fallback: T): T {
 }
 
 export function setJsonItem(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
@@ -30,6 +31,7 @@ export function setJsonItem(key: string, value: unknown) {
 }
 
 export function setTextItem(key: string, value: string) {
+  if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, value);
   } catch (error) {

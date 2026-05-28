@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getRental, deleteRental } from "@/lib/storage";
-import { Rental } from "@/lib/types";
+import { Rental, RENTAL_TERMS } from "@/lib/types";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage } from "@/lib/utils";
 import { generateRentalPDF, generateReturnPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
@@ -13,7 +13,7 @@ export default function RentalDetail() {
   const params = useParams();
   const [rental, setRental] = useState<Rental | null>(null);
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [sentType, setSentType] = useState<"rental" | "return" | null>(null);
 
   useEffect(() => {
     try {
@@ -29,7 +29,7 @@ export default function RentalDetail() {
   if (!rental) return null;
 
   const downloadRentalPDF = () => {
-    const doc = generateRentalPDF(rental);
+    const doc = generateRentalPDF(rental, RENTAL_TERMS);
     doc.save(`sommarbukt-handover-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`);
   };
 
@@ -42,7 +42,7 @@ export default function RentalDetail() {
     if (!rental.guestEmail) return;
     setSending(true);
     try {
-      const doc = type === "rental" ? generateRentalPDF(rental) : generateReturnPDF(rental);
+      const doc = type === "rental" ? generateRentalPDF(rental, RENTAL_TERMS) : generateReturnPDF(rental);
       const blob = doc.output("blob");
       const base64 = await blobToBase64(blob);
       const res = await fetch("/api/send-email", {
@@ -58,7 +58,7 @@ export default function RentalDetail() {
           pdfFilename: `sommarbukt-${type}-${rental.id.slice(0, 8)}.pdf`,
         }),
       });
-      if (res.ok) setSent(true);
+      if (res.ok) setSentType(type);
       else {
         const data = await res.json().catch(() => null);
         throw new Error(data?.error || "Email could not be sent.");
@@ -184,8 +184,8 @@ export default function RentalDetail() {
         )}
 
         {rental.guestEmail && (
-          <Button size="lg" variant="secondary" onClick={() => sendPDF(rental.status === "completed" ? "return" : "rental")} disabled={sending || sent}>
-            <Send className="w-5 h-5 mr-2" /> {sent ? "Sent ✓" : sending ? "Sending..." : "Email PDF to Guest"}
+          <Button size="lg" variant="secondary" onClick={() => sendPDF(rental.status === "completed" ? "return" : "rental")} disabled={sending || sentType === (rental.status === "completed" ? "return" : "rental")}>
+            <Send className="w-5 h-5 mr-2" /> {sentType === (rental.status === "completed" ? "return" : "rental") ? "Sent ✓" : sending ? "Sending..." : "Email PDF to Guest"}
           </Button>
         )}
 

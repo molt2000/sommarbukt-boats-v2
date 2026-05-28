@@ -48,7 +48,7 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   y += 4;
   y = section(doc, "Safety Checklist", y);
   Object.entries(rental.safetyChecklist).forEach(([item, checked]) => {
-    y = row(doc, checked ? "Yes" : "No", item, y);
+    y = row(doc, item, checked ? "Yes" : "No", y);
   });
 
   y += 4;
@@ -248,8 +248,8 @@ function row(doc: jsPDF, label: string, value: string, y: number): number {
   doc.text(label, 15, y);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(30, 30, 30);
-  const lines = doc.splitTextToSize(value || "-", 120);
-  doc.text(lines, 60, y);
+  const lines = doc.splitTextToSize(value || "-", 100);
+  doc.text(lines, 95, y);
   return y + Math.max(lines.length * 4.5, 6);
 }
 
