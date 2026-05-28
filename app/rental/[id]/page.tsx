@@ -102,7 +102,12 @@ export default function RentalDetail() {
         <Row label="Passengers" value={String(rental.passengerCount)} />
         <Row label="Licence" value={rental.licenceNumber || "None"} />
         <Row label="Born before 1980" value={rental.bornBefore1980 ? "Yes" : "No"} />
-        {rental.idPhotoData && <img src={rental.idPhotoData} alt="ID" className="mt-3 rounded-lg w-full max-w-xs" />}
+        {(rental.idPhotoData || rental.idPhotoDataBack) && (
+          <div className="flex gap-2 mt-3">
+            {rental.idPhotoData && <img src={rental.idPhotoData} alt="ID Front" className="rounded-lg flex-1 max-w-[48%] object-cover" />}
+            {rental.idPhotoDataBack && <img src={rental.idPhotoDataBack} alt="ID Back" className="rounded-lg flex-1 max-w-[48%] object-cover" />}
+          </div>
+        )}
       </Card>
 
       <Card icon={<Ship className="w-5 h-5" />} title="Rental">
@@ -140,6 +145,7 @@ export default function RentalDetail() {
         <Row label="Deposit" value={rental.depositAmount} />
         <Row label="Deposit held" value={rental.depositReceived ? "✓ Yes" : "✗ No"} />
         {rental.status === "completed" && <Row label="Deposit returned" value={rental.depositReturned ? "✓ Yes" : "✗ No"} />}
+        {rental.status === "completed" && rental.depositDeduction ? <Row label="Deduction" value={rental.depositDeduction} /> : null}
       </Card>
 
       <Card icon={<FileSignature className="w-5 h-5" />} title="Signature">
@@ -147,8 +153,8 @@ export default function RentalDetail() {
         <div className="mt-2 text-sm text-gray-500">{rental.guestName} — {formatDate(rental.createdAt)}</div>
       </Card>
 
-      {/* Return photos if completed */}
-      {rental.status === "completed" && rental.checkinPhotos.length > 0 && (
+      {/* Return info if completed */}
+      {rental.status === "completed" && (
         <Card icon={<Camera className="w-5 h-5" />} title="Return Photos">
           <Row label="Fuel" value={rental.checkinFuel} />
           <Row label="Condition" value={rental.checkinCondition} />

@@ -31,7 +31,6 @@ export default function RentalWizard() {
   const [step, setStep] = useState(0);
   const [rental, setRental] = useState<Rental>(newRental());
   const [boats, setBoats] = useState<{id:string;name:string;available:boolean}[]>([]);
-  const [rentalTerms, setRentalTerms] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
@@ -55,10 +54,8 @@ export default function RentalWizard() {
     }));
 
     setBoats(boatsWithAvailability);
-    setRentalTerms(RENTAL_TERMS);
   } catch (error) {
     alert(getErrorMessage(error));
-    setRentalTerms(RENTAL_TERMS);
   }
 }, []);
 
@@ -85,7 +82,7 @@ export default function RentalWizard() {
 
   const complete = () => {
   try {
-    const doc = generateRentalPDF(rental, rentalTerms);
+    const doc = generateRentalPDF(rental, RENTAL_TERMS);
     const arrayBuffer = doc.output("arraybuffer");
     const blob = new Blob([arrayBuffer], { type: "application/pdf" });
     saveRental(rental);
@@ -163,7 +160,7 @@ export default function RentalWizard() {
         {step === 2 && <StepSafety rental={rental} updateChecklist={updateChecklist} />}
         {step === 3 && <StepPhotos rental={rental} update={update} />}
         {step === 4 && <StepPayment rental={rental} update={update} />}
-        {step === 5 && <StepSign rental={rental} update={update} terms={rentalTerms} />}
+        {step === 5 && <StepSign rental={rental} update={update} terms={RENTAL_TERMS} />}
         {step === 6 && <StepDone rental={rental} downloadPDF={downloadPDF} sendEmail={sendEmail} sending={sending} sent={sent} />}
       </div>
 
