@@ -74,7 +74,7 @@ export default function RentalWizard() {
       case 1: return !!(rental.boatId && rental.returnDate && rental.returnDate > rental.checkoutDate);
       case 2: return true;
       case 3: return rental.checkoutPhotos.length >= 4;
-      case 4: return true;
+      case 4: return !!(rental.depositAmount && rental.depositReceived);
       case 5: return !!rental.signatureData;
       default: return true;
     }
