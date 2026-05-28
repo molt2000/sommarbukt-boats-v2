@@ -111,7 +111,7 @@ export default function RentalWizard() {
       const base64 = await blobToBase64(pdfBlob);
       const res = await fetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-api-token": process.env.NEXT_PUBLIC_API_TOKEN ?? "" },
         body: JSON.stringify({
           to: rental.guestEmail,
           subject: `Sommarbukt Boat Rental Agreement - ${rental.boatName}`,
@@ -127,8 +127,9 @@ export default function RentalWizard() {
       }
     } catch (e) {
       alert(`${getErrorMessage(e)} You can still download the PDF and share it manually.`);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   return (

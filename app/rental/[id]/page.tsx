@@ -47,7 +47,7 @@ export default function RentalDetail() {
       const base64 = await blobToBase64(blob);
       const res = await fetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-api-token": process.env.NEXT_PUBLIC_API_TOKEN ?? "" },
         body: JSON.stringify({
           to: rental.guestEmail,
           subject: type === "rental"
@@ -65,8 +65,9 @@ export default function RentalDetail() {
       }
     } catch (error) {
       alert(`${getErrorMessage(error)} Download the PDF and share manually.`);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   const handleDelete = () => {

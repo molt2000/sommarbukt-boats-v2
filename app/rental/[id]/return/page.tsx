@@ -76,7 +76,7 @@ export default function ReturnWizard() {
       const base64 = await blobToBase64(pdfBlob);
       const res = await fetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-api-token": process.env.NEXT_PUBLIC_API_TOKEN ?? "" },
         body: JSON.stringify({
           to: rental.guestEmail,
           subject: `Sommarbukt Boat Return Report - ${rental.boatName}`,
@@ -92,8 +92,9 @@ export default function ReturnWizard() {
       }
     } catch (error) {
       alert(getErrorMessage(error));
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   return (

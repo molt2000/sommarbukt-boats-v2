@@ -37,15 +37,10 @@ export function saveRental(rental: Rental) {
 
   const all = getRentals();
 
-  const status = String((rental as any)?.status ?? "").toLowerCase();
-  const boatId = (rental as any)?.boatId as string | undefined;
-
-  if (status === "active" && boatId) {
-    const conflict = all.find(r => {
-      const rStatus = String((r as any)?.status ?? "").toLowerCase();
-      const rBoatId = (r as any)?.boatId as string | undefined;
-      return r.id !== rental.id && rStatus === "active" && rBoatId === boatId;
-    });
+  if (rental.status === "active" && rental.boatId) {
+    const conflict = all.find(r =>
+      r.id !== rental.id && r.status === "active" && r.boatId === rental.boatId
+    );
 
     if (conflict) {
       throw new Error(

@@ -7,6 +7,11 @@ const MAX_PDF_BASE64_LENGTH = 8_000_000;
 
 export async function POST(req: NextRequest) {
   try {
+    const expectedToken = process.env.NEXT_PUBLIC_API_TOKEN;
+    if (!expectedToken || req.headers.get("x-api-token") !== expectedToken) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid email request." }, { status: 400 });
@@ -66,9 +71,9 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Email error:", error);
-    return NextResponse.json({ error: error.message || "Email could not be sent." }, { status: 500 });
+    return NextResponse.json({ error: "Email could not be sent." }, { status: 500 });
   }
 }
 
