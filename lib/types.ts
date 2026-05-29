@@ -174,6 +174,11 @@ export const SAFETY_ITEMS = [
 
 export const FUEL_LEVELS = ["Full", "3/4", "Half", "1/4", "Empty"];
 
+function localNow(): string {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
 export function newRental(): Rental {
   return {
     id: crypto.randomUUID(),
@@ -183,7 +188,7 @@ export function newRental(): Rental {
     idPhotoData: "", idPhotoDataBack: "", passengerCount: 1, hasLicence: false, licenceNumber: "", licencePhotoData: "",
     bornBefore1980: false,
     boatId: "", boatName: "",
-    checkoutDate: new Date().toISOString().slice(0, 16), returnDate: "", actualReturn: "",
+    checkoutDate: localNow(), returnDate: "", actualReturn: "",
     safetyChecklist: Object.fromEntries(SAFETY_ITEMS.map(i => [i, false])),
     checkoutDamages: [], checkinDamages: [],
     checkoutFuel: "Full",
