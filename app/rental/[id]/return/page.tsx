@@ -130,7 +130,6 @@ export default function ReturnWizard() {
       <div className="step-enter">
         {step === 0 && (
           <div className="space-y-5 pb-24">
-            <p className="text-sm text-gray-500">Document any new damage and log the return fuel level.</p>
             <DamageReport
               existingDamages={boatDamages}
               boatId={rental.boatId}

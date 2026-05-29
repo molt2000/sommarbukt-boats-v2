@@ -356,7 +356,6 @@ function StepSafety({ rental, updateChecklist }: { rental: Rental; updateCheckli
 function StepCondition({ rental, update, boatDamages }: { rental: Rental; update: (p: Partial<Rental>) => void; boatDamages: import("@/lib/types").Damage[] }) {
   return (
     <div className="space-y-5 pb-24">
-      <p className="text-sm text-gray-500">Document any pre-existing damage and log the current fuel level.</p>
       <DamageReport
         existingDamages={boatDamages}
         boatId={rental.boatId}

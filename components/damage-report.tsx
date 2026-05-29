@@ -8,11 +8,11 @@ import Button from "@/components/ui/button";
 export type { Damage };
 
 const VIEWS: { key: Damage["view"]; label: string; src: string }[] = [
-  { key: "stb", label: "Starboard", src: "/boats/steuerbord.png" },
-  { key: "bb", label: "Port", src: "/boats/backbord.png" },
   { key: "front", label: "Bow", src: "/boats/bug.png" },
   { key: "rear", label: "Stern", src: "/boats/heck.png" },
-  { key: "top", label: "Top view", src: "/boats/top.png" },
+  { key: "stb", label: "Starboard", src: "/boats/steuerbord.png" },
+  { key: "bb", label: "Port", src: "/boats/backbord.png" },
+  { key: "top", label: "Top", src: "/boats/top.png" },
 ];
 
 interface SheetState {
@@ -30,6 +30,56 @@ interface Props {
   boatId: string;
   damages: Damage[];
   onChange: (damages: Damage[]) => void;
+}
+
+function ViewPanel({
+  view,
+  existingForView,
+  newForView,
+  onTap,
+  onDotTap,
+}: {
+  view: (typeof VIEWS)[number];
+  existingForView: Damage[];
+  newForView: Damage[];
+  onTap: (view: Damage["view"], e: React.MouseEvent<HTMLDivElement>) => void;
+  onDotTap: (e: React.MouseEvent, d: Damage) => void;
+}) {
+  return (
+    <div className="flex flex-col">
+      <div
+        className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-crosshair select-none"
+        onClick={(e) => onTap(view.key, e)}
+      >
+        <img
+          src={view.src}
+          alt={view.label}
+          className="w-full object-contain pointer-events-none"
+          draggable={false}
+        />
+        {existingForView.map((d) => (
+          <button
+            key={d.id}
+            className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/80 border-2 border-brand/60 shadow flex items-center justify-center text-brand/70 font-bold text-sm leading-none"
+            style={{ left: `${d.px}%`, top: `${d.py}%` }}
+            onClick={(e) => onDotTap(e, d)}
+          >
+            !
+          </button>
+        ))}
+        {newForView.map((d) => (
+          <button
+            key={d.id}
+            className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-red-500 border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-sm leading-none"
+            style={{ left: `${d.px}%`, top: `${d.py}%` }}
+            onClick={(e) => onDotTap(e, d)}
+          >
+            !
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function DamageReport({ existingDamages, boatId: _boatId, damages, onChange }: Props) {
@@ -73,64 +123,29 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
 
   const isExisting = (d: Damage) => existingDamages.some((e) => e.id === d.id);
 
+  const viewProps = (key: Damage["view"]) => ({
+    existingForView: existingDamages.filter((d) => d.view === key),
+    newForView: damages.filter((d) => d.view === key),
+    onTap: handleImageTap,
+    onDotTap: handleDotTap,
+  });
+
   return (
-    <div className="pb-4">
-      <p className="text-sm text-gray-500 mb-4">
-        Tap anywhere on the boat to mark and document damage.
-      </p>
-
-      <div className="space-y-6">
-        {VIEWS.map((view) => {
-          const existingForView = existingDamages.filter((d) => d.view === view.key);
-          const newForView = damages.filter((d) => d.view === view.key);
-          const total = existingForView.length + newForView.length;
-
-          return (
-            <div key={view.key}>
-              <div className="text-sm font-medium text-gray-600 mb-2">{view.label}</div>
-              <div
-                className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100 cursor-crosshair select-none"
-                onClick={(e) => handleImageTap(view.key, e)}
-              >
-                <img
-                  src={view.src}
-                  alt={view.label}
-                  className="w-full object-contain pointer-events-none"
-                  draggable={false}
-                />
-
-                {existingForView.map((d) => (
-                  <button
-                    key={d.id}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/80 border-2 border-brand/60 shadow flex items-center justify-center text-brand/70 font-bold text-base leading-none"
-                    style={{ left: `${d.px}%`, top: `${d.py}%` }}
-                    onClick={(e) => handleDotTap(e, d)}
-                  >
-                    !
-                  </button>
-                ))}
-
-                {newForView.map((d) => (
-                  <button
-                    key={d.id}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-red-500 border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-base leading-none"
-                    style={{ left: `${d.px}%`, top: `${d.py}%` }}
-                    onClick={(e) => handleDotTap(e, d)}
-                  >
-                    !
-                  </button>
-                ))}
-              </div>
-
-              {total > 0 && (
-                <p className="text-xs text-gray-400 mt-1.5">
-                  {total} damage{total !== 1 ? "s" : ""} marked
-                </p>
-              )}
-            </div>
-          );
-        })}
+    <div className="pb-4 space-y-2">
+      {/* Row 1: Bow + Stern */}
+      <div className="grid grid-cols-2 gap-2">
+        <ViewPanel view={VIEWS[0]} {...viewProps("front")} />
+        <ViewPanel view={VIEWS[1]} {...viewProps("rear")} />
       </div>
+
+      {/* Row 2: Starboard */}
+      <ViewPanel view={VIEWS[2]} {...viewProps("stb")} />
+
+      {/* Row 3: Port */}
+      <ViewPanel view={VIEWS[3]} {...viewProps("bb")} />
+
+      {/* Row 4: Top */}
+      <ViewPanel view={VIEWS[4]} {...viewProps("top")} />
 
       {/* Bottom Sheet */}
       {sheet && (
