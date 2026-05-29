@@ -1,5 +1,3 @@
-import { getJsonItem } from "./safe-storage";
-
 export interface Rental {
   id: string;
   createdAt: string;
@@ -65,16 +63,6 @@ export interface Boat {
   id: string;
   name: string;
   available?: boolean;
-}
-
-const DEFAULT_BOATS: Boat[] = [
-  { id: "1", name: "Tind", available: true },
-  { id: "2", name: "Nordlys", available: true },
-];
-
-export function getBoats(): Boat[] {
-  const boats = getJsonItem<{ id: string; name: string }[]>("sb_boats", DEFAULT_BOATS);
-  return boats;
 }
 
 export const RENTAL_TERMS = `BOAT RENTAL AGREEMENT

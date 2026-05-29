@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
-import { Camera, X, Trash2 } from "lucide-react";
+import { Camera, X, Trash2, ZoomIn } from "lucide-react";
 import { readAndCompressImage } from "@/lib/image";
 import { Damage } from "@/lib/types";
 import Button from "@/components/ui/button";
@@ -34,6 +34,7 @@ interface Props {
 
 export default function DamageReport({ existingDamages, boatId: _boatId, damages, onChange }: Props) {
   const [sheet, setSheet] = useState<SheetState | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const handleImageTap = useCallback(
     (view: Damage["view"], e: React.MouseEvent<HTMLDivElement>) => {
@@ -101,19 +102,23 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
                 {existingForView.map((d) => (
                   <button
                     key={d.id}
-                    className="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/50 border-2 border-brand/70 shadow"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/80 border-2 border-brand/60 shadow flex items-center justify-center text-brand/70 font-bold text-base leading-none"
                     style={{ left: `${d.px}%`, top: `${d.py}%` }}
                     onClick={(e) => handleDotTap(e, d)}
-                  />
+                  >
+                    !
+                  </button>
                 ))}
 
                 {newForView.map((d) => (
                   <button
                     key={d.id}
-                    className="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand border-2 border-white shadow-md"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-red-500 border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-base leading-none"
                     style={{ left: `${d.px}%`, top: `${d.py}%` }}
                     onClick={(e) => handleDotTap(e, d)}
-                  />
+                  >
+                    !
+                  </button>
                 ))}
               </div>
 
@@ -213,7 +218,16 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
                 {sheet.damage.photos.length > 0 && (
                   <div className="grid grid-cols-2 gap-2">
                     {sheet.damage.photos.map((p, i) => (
-                      <img key={i} src={p} className="w-full h-36 object-cover rounded-lg" alt="" />
+                      <button
+                        key={i}
+                        className="relative rounded-lg overflow-hidden group"
+                        onClick={() => setLightbox(p)}
+                      >
+                        <img src={p} className="w-full h-36 object-cover" alt="" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
+                          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition" />
+                        </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -238,6 +252,27 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
               </>
             ) : null}
           </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"
+            onClick={() => setLightbox(null)}
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <img
+            src={lightbox}
+            className="max-w-full max-h-full object-contain"
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

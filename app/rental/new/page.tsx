@@ -1,8 +1,8 @@
 "use client";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Rental, getBoats, RENTAL_TERMS, SAFETY_ITEMS, FUEL_LEVELS, newRental } from "@/lib/types";
-import { saveRental, getRentals, getBoatDamages } from "@/lib/storage";
+import { Rental, RENTAL_TERMS, SAFETY_ITEMS, FUEL_LEVELS, newRental } from "@/lib/types";
+import { saveRental, getRentals, getBoatDamages, getBoats } from "@/lib/storage";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage, isValidEmail } from "@/lib/utils";
 import { readAndCompressImage } from "@/lib/image";
 import { generateRentalPDF } from "@/lib/pdf";
@@ -43,8 +43,8 @@ export default function RentalWizard() {
 
     const activeBoatIds = new Set(
       storedRentals
-        .filter(r => String((r as any)?.status ?? "").toLowerCase() === "active")
-        .map(r => (r as any)?.boatId)
+        .filter(r => r.status === "active")
+        .map(r => r.boatId)
         .filter(Boolean)
     );
 

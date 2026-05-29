@@ -44,7 +44,7 @@ export default function ReturnWizard() {
 
   const canNext = (): boolean => {
     switch (step) {
-      case 0: return true;
+      case 0: return !!rental.checkinFuel;
       case 1: return rental.depositReturned || !!rental.depositDeduction;
       default: return true;
     }

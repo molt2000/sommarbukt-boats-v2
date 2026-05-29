@@ -1,5 +1,22 @@
 import { getJsonItem, setJsonItem } from "./safe-storage";
-import { Damage, Rental } from "./types";
+import { Boat, Damage, Rental } from "./types";
+
+const DEFAULT_BOATS: Boat[] = [
+  { id: "1", name: "Tind", available: true },
+  { id: "2", name: "Nordlys", available: true },
+];
+
+export function getBoats(): Boat[] {
+  return getJsonItem<Boat[]>("sb_boats", DEFAULT_BOATS);
+}
+
+function normalizeRental(r: Rental): Rental {
+  return {
+    ...r,
+    checkoutDamages: r.checkoutDamages ?? [],
+    checkinDamages: r.checkinDamages ?? [],
+  };
+}
 
 const BOAT_DAMAGES_KEY = "sb_boat_damages";
 
@@ -33,7 +50,7 @@ export function getRentals(): Rental[] {
     if (!Array.isArray(parsed)) {
       throw new Error("Stored rental data is not a list.");
     }
-    return parsed;
+    return parsed.map(normalizeRental);
   } catch (error) {
     console.error("Could not read rentals from localStorage:", error);
     throw new Error(
