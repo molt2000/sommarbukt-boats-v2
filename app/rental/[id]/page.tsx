@@ -127,18 +127,9 @@ export default function RentalDetail() {
         ))}
       </Card>
 
-      <Card icon={<Camera className="w-5 h-5" />} title="Hand-Over Photos">
+      <Card icon={<Camera className="w-5 h-5" />} title="Hand-Over Condition">
         <Row label="Fuel" value={rental.checkoutFuel} />
-        <Row label="Condition" value={rental.checkoutCondition} />
-        {rental.checkoutDamageNotes && <Row label="Notes" value={rental.checkoutDamageNotes} />}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          {rental.checkoutPhotos.map((p, i) => (
-            <div key={i} className="relative rounded-lg overflow-hidden">
-              <img src={p.dataUrl} alt={p.label} className="w-full h-24 object-cover" />
-              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5">{p.label}</div>
-            </div>
-          ))}
-        </div>
+        <Row label="Damages documented" value={String((rental.checkoutDamages ?? []).length)} />
       </Card>
 
       <Card icon={<CreditCard className="w-5 h-5" />} title="Deposit">
@@ -156,19 +147,9 @@ export default function RentalDetail() {
 
       {/* Return info if completed */}
       {rental.status === "completed" && (
-        <Card icon={<Camera className="w-5 h-5" />} title="Return Photos">
+        <Card icon={<Camera className="w-5 h-5" />} title="Return Condition">
           <Row label="Fuel" value={rental.checkinFuel} />
-          <Row label="Condition" value={rental.checkinCondition} />
-          <Row label="Damage" value={rental.damageFound ? "YES" : "No"} />
-          {rental.checkinDamageNotes && <Row label="Notes" value={rental.checkinDamageNotes} />}
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {rental.checkinPhotos.map((p, i) => (
-              <div key={i} className="relative rounded-lg overflow-hidden">
-                <img src={p.dataUrl} alt={p.label} className="w-full h-24 object-cover" />
-                <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5">{p.label}</div>
-              </div>
-            ))}
-          </div>
+          <Row label="New damages" value={String((rental.checkinDamages ?? []).length)} />
         </Card>
       )}
 

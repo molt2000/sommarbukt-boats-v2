@@ -1,8 +1,8 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Rental, getBoats, RENTAL_TERMS, SAFETY_ITEMS, PHOTO_ANGLES, FUEL_LEVELS, newRental } from "@/lib/types";
-import { saveRental, getRentals } from "@/lib/storage";
+import { Rental, getBoats, RENTAL_TERMS, SAFETY_ITEMS, FUEL_LEVELS, newRental } from "@/lib/types";
+import { saveRental, getRentals, getBoatDamages } from "@/lib/storage";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage, isValidEmail } from "@/lib/utils";
 import { readAndCompressImage } from "@/lib/image";
 import { generateRentalPDF } from "@/lib/pdf";
@@ -11,15 +11,15 @@ import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import Field from "@/components/ui/field";
 import Checkbox from "@/components/ui/checkbox";
-import PhotoCapture from "@/components/photo-capture";
 import SignaturePad from "@/components/signature-pad";
-import { ArrowLeft, ArrowRight, User, Ship, Shield, Camera, CreditCard, FileSignature, Check, Send, Download } from "lucide-react";
+import DamageReport from "@/components/damage-report";
+import { ArrowLeft, ArrowRight, User, Ship, Shield, AlertCircle, CreditCard, FileSignature, Check, Send, Download, Camera } from "lucide-react";
 
 const STEPS = [
   { title: "Guest", icon: User },
   { title: "Rental", icon: Ship },
   { title: "Safety Check", icon: Shield },
-  { title: "Boat Photos", icon: Camera },
+  { title: "Condition", icon: AlertCircle },
   { title: "Deposit", icon: CreditCard },
   { title: "Signature", icon: FileSignature },
   { title: "Done", icon: Check },
@@ -68,12 +68,17 @@ export default function RentalWizard() {
     setRental(prev => ({ ...prev, safetyChecklist: { ...prev.safetyChecklist, [item]: val } }));
   }, []);
 
+  const boatDamages = useMemo(
+    () => (rental.boatId ? getBoatDamages(rental.boatId) : []),
+    [rental.boatId]
+  );
+
   const canNext = (): boolean => {
     switch (step) {
       case 0: return !!(rental.guestName && rental.guestPhone && isValidEmail(rental.guestEmail) && rental.idPhotoData && (rental.bornBefore1980 || rental.licenceNumber));
       case 1: return !!(rental.boatId && rental.returnDate && rental.returnDate > rental.checkoutDate);
       case 2: return true;
-      case 3: return rental.checkoutPhotos.length >= 4;
+      case 3: return true;
       case 4: return !!(rental.depositAmount && rental.depositReceived);
       case 5: return !!rental.signatureData;
       default: return true;
@@ -81,18 +86,18 @@ export default function RentalWizard() {
   };
 
   const complete = () => {
-  try {
-    const doc = generateRentalPDF(rental, RENTAL_TERMS);
-    const arrayBuffer = doc.output("arraybuffer");
-    const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-    saveRental(rental);
-    setPdfBlob(blob);
-    setStep(6);
-  } catch (err) {
-    console.error("Could not complete rental:", err);
-    alert(getErrorMessage(err));
-  }
-};
+    try {
+      const doc = generateRentalPDF(rental, RENTAL_TERMS);
+      const arrayBuffer = doc.output("arraybuffer");
+      const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+      saveRental(rental);
+      setPdfBlob(blob);
+      setStep(6);
+    } catch (err) {
+      console.error("Could not complete rental:", err);
+      alert(getErrorMessage(err));
+    }
+  };
 
   const downloadPDF = () => {
     if (!pdfBlob) return;
@@ -148,7 +153,7 @@ export default function RentalWizard() {
       {/* Progress */}
       {step < 6 && (
         <div className="flex gap-1.5 mb-8">
-          {STEPS.slice(0, 6).map((s, i) => (
+          {STEPS.slice(0, 6).map((_, i) => (
             <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i <= step ? "bg-brand" : "bg-gray-200"}`} />
           ))}
         </div>
@@ -159,7 +164,7 @@ export default function RentalWizard() {
         {step === 0 && <StepGuest rental={rental} update={update} />}
         {step === 1 && <StepRental rental={rental} update={update} boats={boats} />}
         {step === 2 && <StepSafety rental={rental} updateChecklist={updateChecklist} />}
-        {step === 3 && <StepPhotos rental={rental} update={update} />}
+        {step === 3 && <StepCondition rental={rental} update={update} boatDamages={boatDamages} />}
         {step === 4 && <StepPayment rental={rental} update={update} />}
         {step === 5 && <StepSign rental={rental} update={update} terms={RENTAL_TERMS} />}
         {step === 6 && <StepDone rental={rental} downloadPDF={downloadPDF} sendEmail={sendEmail} sending={sending} sent={sent} />}
@@ -348,42 +353,21 @@ function StepSafety({ rental, updateChecklist }: { rental: Rental; updateCheckli
   );
 }
 
-function StepPhotos({ rental, update }: { rental: Rental; update: (p: Partial<Rental>) => void }) {
+function StepCondition({ rental, update, boatDamages }: { rental: Rental; update: (p: Partial<Rental>) => void; boatDamages: import("@/lib/types").Damage[] }) {
   return (
     <div className="space-y-5 pb-24">
-      <p className="text-sm text-gray-500">Take photos of the boat before departure. At least 4 photos required.</p>
-
-      <PhotoCapture
-        labels={PHOTO_ANGLES}
-        photos={rental.checkoutPhotos}
-        onChange={photos => update({ checkoutPhotos: photos })}
+      <p className="text-sm text-gray-500">Document any pre-existing damage and log the current fuel level.</p>
+      <DamageReport
+        existingDamages={boatDamages}
+        boatId={rental.boatId}
+        damages={rental.checkoutDamages}
+        onChange={(damages) => update({ checkoutDamages: damages })}
       />
-
       <Field label="Fuel Level">
         <Select value={rental.checkoutFuel} onChange={e => update({ checkoutFuel: e.target.value })}>
           {FUEL_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
         </Select>
       </Field>
-
-      <Field label="Overall Condition">
-        <Select value={rental.checkoutCondition} onChange={e => update({ checkoutCondition: e.target.value })}>
-          <option value="Good">Good</option>
-          <option value="Minor wear">Minor wear</option>
-          <option value="Pre-existing damage">Pre-existing damage</option>
-        </Select>
-      </Field>
-
-      <Field label="Existing Damage Notes" optional>
-        <textarea
-          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-base focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 transition min-h-[100px]"
-          rows={3}
-          value={rental.checkoutDamageNotes}
-          onChange={e => update({ checkoutDamageNotes: e.target.value })}
-          placeholder="Note any pre-existing damage..."
-        />
-      </Field>
-
-      <p className="text-xs text-gray-400">Photos: {rental.checkoutPhotos.length} / {PHOTO_ANGLES.length} — minimum 4 required</p>
     </div>
   );
 }

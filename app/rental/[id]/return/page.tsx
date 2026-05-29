@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getRental, saveRental } from "@/lib/storage";
-import { Rental, PHOTO_ANGLES, FUEL_LEVELS } from "@/lib/types";
+import { getRental, saveRental, getBoatDamages } from "@/lib/storage";
+import { Rental, FUEL_LEVELS } from "@/lib/types";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage } from "@/lib/utils";
 import { generateReturnPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
@@ -10,8 +10,8 @@ import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import Field from "@/components/ui/field";
 import Checkbox from "@/components/ui/checkbox";
-import PhotoCapture from "@/components/photo-capture";
-import { ArrowLeft, ArrowRight, Camera, CheckCircle, Check, Download, Send } from "lucide-react";
+import DamageReport from "@/components/damage-report";
+import { ArrowLeft, ArrowRight, CheckCircle, Check, Download, Send } from "lucide-react";
 
 export default function ReturnWizard() {
   const router = useRouter();
@@ -33,13 +33,18 @@ export default function ReturnWizard() {
     }
   }, [params.id, router]);
 
+  const boatDamages = useMemo(
+    () => (rental?.boatId ? getBoatDamages(rental.boatId) : []),
+    [rental?.boatId]
+  );
+
   if (!rental) return null;
 
   const update = (patch: Partial<Rental>) => setRental(prev => prev ? { ...prev, ...patch } : prev);
 
   const canNext = (): boolean => {
     switch (step) {
-      case 0: return rental.checkinPhotos.length >= 4 && !!rental.checkinFuel && !!rental.checkinCondition;
+      case 0: return true;
       case 1: return rental.depositReturned || !!rental.depositDeduction;
       default: return true;
     }
@@ -97,10 +102,15 @@ export default function ReturnWizard() {
     }
   };
 
+  const hasDamage = (rental.checkinDamages ?? []).length > 0;
+
   return (
     <div className="py-6">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => step === 0 ? router.back() : step === 2 ? router.push(`/rental/${params.id}`) : setStep(s => s - 1)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center">
+        <button
+          onClick={() => step === 0 ? router.back() : step === 2 ? router.push(`/rental/${params.id}`) : setStep(s => s - 1)}
+          className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
@@ -111,46 +121,28 @@ export default function ReturnWizard() {
 
       {step < 2 && (
         <div className="flex gap-1.5 mb-8">
-          {[0, 1].map(i => <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-brand" : "bg-gray-200"}`} />)}
+          {[0, 1].map(i => (
+            <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-brand" : "bg-gray-200"}`} />
+          ))}
         </div>
       )}
 
       <div className="step-enter">
         {step === 0 && (
           <div className="space-y-5 pb-24">
-            <p className="text-sm text-gray-500">Take return photos and check condition. At least 4 required.</p>
-
-            <PhotoCapture labels={PHOTO_ANGLES} photos={rental.checkinPhotos} onChange={photos => update({ checkinPhotos: photos })} />
-
-            <Field label="Fuel Level">
+            <p className="text-sm text-gray-500">Document any new damage and log the return fuel level.</p>
+            <DamageReport
+              existingDamages={boatDamages}
+              boatId={rental.boatId}
+              damages={rental.checkinDamages ?? []}
+              onChange={damages => update({ checkinDamages: damages })}
+            />
+            <Field label="Fuel Level on Return">
               <Select value={rental.checkinFuel} onChange={e => update({ checkinFuel: e.target.value })}>
                 <option value="">Select...</option>
                 {FUEL_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
               </Select>
             </Field>
-
-            <Field label="Condition">
-              <Select value={rental.checkinCondition} onChange={e => update({ checkinCondition: e.target.value })}>
-                <option value="">Select...</option>
-                <option value="Good">Good — no issues</option>
-                <option value="Minor wear">Minor wear</option>
-                <option value="Damage found">Damage found</option>
-              </Select>
-            </Field>
-
-            <Checkbox checked={rental.damageFound} onChange={v => update({ damageFound: v })} label="Damage found during return inspection" />
-
-            {rental.damageFound && (
-              <Field label="Damage Description">
-                <textarea
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-base focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  rows={3}
-                  value={rental.checkinDamageNotes}
-                  onChange={e => update({ checkinDamageNotes: e.target.value })}
-                  placeholder="Describe the damage..."
-                />
-              </Field>
-            )}
           </div>
         )}
 
@@ -163,10 +155,13 @@ export default function ReturnWizard() {
               <div className="text-xl font-bold">{rental.depositAmount || "—"}</div>
             </div>
 
-            {!rental.damageFound ? (
-              <Checkbox checked={rental.depositReturned} onChange={v => update({ depositReturned: v })} label="Full deposit returned to guest" required />
+            {!hasDamage ? (
+              <Checkbox checked={rental.depositReturned} onChange={v => update({ depositReturned: v })} label="Full deposit returned to guest" />
             ) : (
               <div className="space-y-4">
+                <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                  {(rental.checkinDamages ?? []).length} new damage{(rental.checkinDamages ?? []).length !== 1 ? "s" : ""} documented at return.
+                </p>
                 <Field label="Deduction Amount">
                   <Input value={rental.depositDeduction} onChange={e => update({ depositDeduction: e.target.value })} placeholder="e.g. 1500 NOK" />
                 </Field>

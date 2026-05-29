@@ -1,5 +1,24 @@
 import { getJsonItem, setJsonItem } from "./safe-storage";
-import { Rental } from "./types";
+import { Damage, Rental } from "./types";
+
+const BOAT_DAMAGES_KEY = "sb_boat_damages";
+
+export function getBoatDamages(boatId: string): Damage[] {
+  const all = getJsonItem<Record<string, Damage[]>>(BOAT_DAMAGES_KEY, {});
+  return all[boatId] ?? [];
+}
+
+function mergeBoatDamages(boatId: string, damages: Damage[]): void {
+  if (!boatId || !damages.length) return;
+  const all = getJsonItem<Record<string, Damage[]>>(BOAT_DAMAGES_KEY, {});
+  const existing = all[boatId] ?? [];
+  const existingIds = new Set(existing.map((d) => d.id));
+  const toAdd = damages.filter((d) => !existingIds.has(d.id));
+  if (toAdd.length) {
+    all[boatId] = [...existing, ...toAdd];
+    setJsonItem(BOAT_DAMAGES_KEY, all);
+  }
+}
 
 const KEY = "sommarbukt-rentals";
 
@@ -54,6 +73,12 @@ export function saveRental(rental: Rental) {
   else all.unshift(rental);
 
   setJsonItem(KEY, all);
+
+  // Persist all documented damages to the per-boat store
+  mergeBoatDamages(rental.boatId, [
+    ...(rental.checkoutDamages ?? []),
+    ...(rental.checkinDamages ?? []),
+  ]);
 }
 
 export function deleteRental(id: string) {

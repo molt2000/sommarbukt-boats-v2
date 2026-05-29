@@ -29,18 +29,15 @@ export interface Rental {
   // Safety
   safetyChecklist: Record<string, boolean>;
 
+  // Damage documentation
+  checkoutDamages: Damage[];
+  checkinDamages: Damage[];
+
   // Condition
-  checkoutPhotos: PhotoEntry[];
   checkoutFuel: string;
-  checkoutCondition: string;
-  checkoutDamageNotes: string;
 
   // Return
-  checkinPhotos: PhotoEntry[];
   checkinFuel: string;
-  checkinCondition: string;
-  checkinDamageNotes: string;
-  damageFound: boolean;
 
   // Payment
   rentalFee: string;
@@ -53,13 +50,16 @@ export interface Rental {
   signatureData: string; // base64
 }
 
-export interface PhotoEntry {
-  label: string;
-  dataUrl: string;
-  timestamp: string;
-  gpsLat?: number;
-  gpsLng?: number;
+export interface Damage {
+  id: string;
+  view: 'stb' | 'bb' | 'front' | 'rear' | 'top';
+  px: number; // position % relative to container
+  py: number;
+  photos: string[]; // base64 or URL
+  desc: string;
+  date: number; // timestamp
 }
+
 
 export interface Boat {
   id: string;
@@ -184,15 +184,6 @@ export const SAFETY_ITEMS = [
   "Key handed over",
 ];
 
-export const PHOTO_ANGLES = [
-  "Bow (front)",
-  "Stern (back)",
-  "Port side (left)",
-  "Starboard side (right)",
-  "Cockpit / interior",
-  "Engine",
-];
-
 export const FUEL_LEVELS = ["Full", "3/4", "Half", "1/4", "Empty"];
 
 export function newRental(): Rental {
@@ -206,8 +197,9 @@ export function newRental(): Rental {
     boatId: "", boatName: "",
     checkoutDate: new Date().toISOString().slice(0, 16), returnDate: "", actualReturn: "",
     safetyChecklist: Object.fromEntries(SAFETY_ITEMS.map(i => [i, false])),
-    checkoutPhotos: [], checkoutFuel: "Full", checkoutCondition: "Good", checkoutDamageNotes: "",
-    checkinPhotos: [], checkinFuel: "", checkinCondition: "", checkinDamageNotes: "", damageFound: false,
+    checkoutDamages: [], checkinDamages: [],
+    checkoutFuel: "Full",
+    checkinFuel: "",
     rentalFee: "", depositAmount: "", depositReceived: false,
     depositReturned: false, depositDeduction: "",
     signatureData: "",
