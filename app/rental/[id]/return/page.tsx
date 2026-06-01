@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getRental, saveRental, getBoatDamages } from "@/lib/storage";
 import { Rental, FUEL_LEVELS } from "@/lib/types";
-import { blobToBase64, escapeHtml, formatDate, getErrorMessage } from "@/lib/utils";
+import { blobToBase64, escapeHtml, formatDate, getErrorMessage, sanitizeFilename } from "@/lib/utils";
 import { generateReturnPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
@@ -69,7 +69,7 @@ export default function ReturnWizard() {
     const url = URL.createObjectURL(pdfBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `return-${rental.guestName.replace(/\s+/g, "-")}-${rental.id.slice(0, 8)}.pdf`;
+    a.download = `sommarbukt-return-${sanitizeFilename(rental.guestName)}-${rental.id.slice(0, 8)}.pdf`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

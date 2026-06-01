@@ -36,6 +36,16 @@ export function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "An unknown error occurred.";
 }
 
+export function sanitizeFilename(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[/\\:*?"<>|]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60) || "guest";
+}
+
 export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

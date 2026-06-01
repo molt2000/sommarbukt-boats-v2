@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getRental, deleteRental } from "@/lib/storage";
 import { Rental, RENTAL_TERMS } from "@/lib/types";
-import { blobToBase64, escapeHtml, formatDate, getErrorMessage } from "@/lib/utils";
+import { blobToBase64, escapeHtml, formatDate, getErrorMessage, sanitizeFilename } from "@/lib/utils";
 import { generateRentalPDF, generateReturnPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
 import { ArrowLeft, Ship, User, Shield, Camera, CreditCard, FileSignature, Download, Send, CornerDownRight, Trash2 } from "lucide-react";
@@ -30,12 +30,12 @@ export default function RentalDetail() {
 
   const downloadRentalPDF = () => {
     const doc = generateRentalPDF(rental, RENTAL_TERMS);
-    doc.save(`sommarbukt-handover-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`);
+    doc.save(`sommarbukt-handover-${sanitizeFilename(rental.guestName)}-${rental.id.slice(0, 8)}.pdf`);
   };
 
   const downloadReturnPDF = () => {
     const doc = generateReturnPDF(rental);
-    doc.save(`sommarbukt-return-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`);
+    doc.save(`sommarbukt-return-${sanitizeFilename(rental.guestName)}-${rental.id.slice(0, 8)}.pdf`);
   };
 
   const sendPDF = async (type: "rental" | "return") => {

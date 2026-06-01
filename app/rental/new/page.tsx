@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Rental, RENTAL_TERMS, SAFETY_ITEMS, FUEL_LEVELS, newRental } from "@/lib/types";
 import { saveRental, getRentals, getBoatDamages, getBoats } from "@/lib/storage";
-import { blobToBase64, escapeHtml, formatDate, getErrorMessage, isValidEmail } from "@/lib/utils";
+import { blobToBase64, escapeHtml, formatDate, getErrorMessage, isValidEmail, sanitizeFilename } from "@/lib/utils";
 import { readAndCompressImage } from "@/lib/image";
 import { generateRentalPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
@@ -104,7 +104,7 @@ export default function RentalWizard() {
     const url = URL.createObjectURL(pdfBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sommarbukt-handover-${rental.guestName.replace(/\s+/g, "-").toLowerCase()}-${rental.id.slice(0, 8)}.pdf`;
+    a.download = `sommarbukt-handover-${sanitizeFilename(rental.guestName)}-${rental.id.slice(0, 8)}.pdf`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
