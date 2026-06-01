@@ -180,11 +180,11 @@ export default function RentalWizard() {
               </Button>
             )}
             {step < 5 ? (
-              <Button size="lg" onClick={() => setStep(s => s + 1)} disabled={!canNext()} className="flex-1">
+              <Button size="lg" onClick={() => setStep(s => s + 1)} disabled={!canNext()} className="flex-1 w-auto">
                 Next <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <Button size="lg" onClick={complete} disabled={!canNext()} className="flex-1">
+              <Button size="lg" onClick={complete} disabled={!canNext()} className="flex-1 w-auto">
                 Complete Rental <Check className="w-4 h-4 ml-2" />
               </Button>
             )}

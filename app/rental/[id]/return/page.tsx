@@ -202,11 +202,11 @@ export default function ReturnWizard() {
               </Button>
             )}
             {step < 1 ? (
-              <Button size="lg" onClick={() => setStep(1)} disabled={!canNext()} className="flex-1">
+              <Button size="lg" onClick={() => setStep(1)} disabled={!canNext()} className="flex-1 w-auto">
                 Next <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <Button size="lg" onClick={complete} disabled={!canNext()} className="flex-1">
+              <Button size="lg" onClick={complete} disabled={!canNext()} className="flex-1 w-auto">
                 Complete Return <Check className="w-4 h-4 ml-2" />
               </Button>
             )}
