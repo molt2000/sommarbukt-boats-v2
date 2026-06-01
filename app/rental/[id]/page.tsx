@@ -53,7 +53,7 @@ export default function RentalDetail() {
           subject: type === "rental"
             ? `Sommarbukt Boat Rental Agreement - ${rental.boatName}`
             : `Sommarbukt Boat Return Report - ${rental.boatName}`,
-          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Please find your ${type === "rental" ? "rental agreement" : "return report"} attached.</p><p>Thank you for choosing Sommarbukt!<br>Sommarbukt Team</p>`,
+          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Please find your ${type === "rental" ? "rental agreement" : "return report"} attached.</p><p>We hope you enjoyed your time on the water.</p><p>Warm regards,<br>Sommarbukt Team</p>`,
           pdfBase64: base64,
           pdfFilename: `sommarbukt-${type}-${rental.id.slice(0, 8)}.pdf`,
         }),

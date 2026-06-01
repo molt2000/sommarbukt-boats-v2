@@ -85,7 +85,7 @@ export default function ReturnWizard() {
         body: JSON.stringify({
           to: rental.guestEmail,
           subject: `Sommarbukt Boat Return Report - ${rental.boatName}`,
-          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Your boat has been returned. Please find the return report attached.</p><p>Thank you for choosing Sommarbukt!<br>Sommarbukt Team</p>`,
+          html: `<p>Dear ${escapeHtml(rental.guestName)},</p><p>Your boat has been returned. Please find the return report attached.</p><p>We hope you enjoyed your time on the water.</p><p>Warm regards,<br>Sommarbukt Team</p>`,
           pdfBase64: base64,
           pdfFilename: `sommarbukt-return-${rental.id.slice(0, 8)}.pdf`,
         }),
