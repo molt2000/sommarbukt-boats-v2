@@ -11,8 +11,9 @@ iPad-first PWA for managing boat rentals (handover + return), built with Next.js
 
 2. **Environment** — copy `.env.example` to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (publishable key)
-   - `SUPABASE_SERVICE_ROLE_KEY` (server only — keep secret)
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (for emailing PDFs)
+
+   (`SUPABASE_SERVICE_ROLE_KEY` is not required — auth uses the anon key + session cookie.)
 
    Mirror the same variables in Vercel → Settings → Environment Variables (Production + Preview).
 
