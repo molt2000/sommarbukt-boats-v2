@@ -4,6 +4,9 @@ import { Camera, X, Trash2, ZoomIn } from "lucide-react";
 import { readAndCompressImage } from "@/lib/image";
 import { Damage } from "@/lib/types";
 import Button from "@/components/ui/button";
+import StoredImg from "@/components/stored-img";
+import { uploadDataUrl } from "@/lib/upload";
+import { markDamageRepaired } from "@/lib/storage";
 
 export type { Damage };
 
@@ -23,6 +26,7 @@ interface SheetState {
   damage?: Damage;
   photos: string[];
   desc: string;
+  damageId: string;
 }
 
 interface Props {
@@ -30,6 +34,7 @@ interface Props {
   boatId: string;
   damages: Damage[];
   onChange: (damages: Damage[]) => void;
+  onRepaired?: (id: string) => void;
 }
 
 function ViewPanel({
@@ -82,7 +87,7 @@ function ViewPanel({
   );
 }
 
-export default function DamageReport({ existingDamages, boatId: _boatId, damages, onChange }: Props) {
+export default function DamageReport({ existingDamages, boatId, damages, onChange, onRepaired }: Props) {
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -91,26 +96,27 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
       const rect = e.currentTarget.getBoundingClientRect();
       const px = ((e.clientX - rect.left) / rect.width) * 100;
       const py = ((e.clientY - rect.top) / rect.height) * 100;
-      setSheet({ mode: "new", view, px, py, photos: [], desc: "" });
+      setSheet({ mode: "new", view, px, py, photos: [], desc: "", damageId: crypto.randomUUID() });
     },
     []
   );
 
   const handleDotTap = useCallback((e: React.MouseEvent, damage: Damage) => {
     e.stopPropagation();
-    setSheet({ mode: "view", view: damage.view, px: damage.px, py: damage.py, damage, photos: damage.photos, desc: damage.desc });
+    setSheet({ mode: "view", view: damage.view, px: damage.px, py: damage.py, damage, photos: damage.photoPaths, desc: damage.desc, damageId: damage.id });
   }, []);
 
   const saveDamage = () => {
     if (!sheet) return;
     const d: Damage = {
-      id: crypto.randomUUID(),
+      id: sheet.damageId,
       view: sheet.view,
       px: sheet.px,
       py: sheet.py,
-      photos: sheet.photos,
+      photoPaths: sheet.photos,
       desc: sheet.desc,
       date: Date.now(),
+      repairedAt: null,
     };
     onChange([...damages, d]);
     setSheet(null);
@@ -172,7 +178,7 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
                     <div className="grid grid-cols-2 gap-2 mb-2">
                       {sheet.photos.map((p, i) => (
                         <div key={i} className="relative rounded-lg overflow-hidden">
-                          <img src={p} className="w-full h-32 object-cover" alt="" />
+                          <StoredImg path={p} className="w-full h-32 object-cover" />
                           <button
                             className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center"
                             onClick={() =>
@@ -199,7 +205,9 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
                         const file = e.target.files?.[0];
                         if (!file) return;
                         const dataUrl = await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 });
-                        setSheet((prev) => (prev ? { ...prev, photos: [...prev.photos, dataUrl] } : null));
+                        const idx = sheet.photos.length;
+                        const path = await uploadDataUrl(dataUrl, "damage-photos", `${boatId}/${sheet.damageId}/${idx}.jpg`);
+                        setSheet((prev) => (prev ? { ...prev, photos: [...prev.photos, path] } : null));
                         e.target.value = "";
                       }}
                     />
@@ -230,15 +238,15 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
               </>
             ) : sheet.damage ? (
               <>
-                {sheet.damage.photos.length > 0 && (
+                {sheet.damage.photoPaths.length > 0 && (
                   <div className="grid grid-cols-2 gap-2">
-                    {sheet.damage.photos.map((p, i) => (
+                    {sheet.damage.photoPaths.map((p, i) => (
                       <button
                         key={i}
                         className="relative rounded-lg overflow-hidden group"
                         onClick={() => setLightbox(p)}
                       >
-                        <img src={p} className="w-full h-36 object-cover" alt="" />
+                        <StoredImg path={p} className="w-full h-36 object-cover" onClick={() => setLightbox(p)} />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
                           <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition" />
                         </div>
@@ -254,12 +262,22 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
                 <p className="text-xs text-gray-400">
                   {new Date(sheet.damage.date).toLocaleString("de-DE")}
                 </p>
-                {!isExisting(sheet.damage) && (
+                {isExisting(sheet.damage) ? (
                   <Button
                     variant="danger"
                     size="lg"
-                    onClick={() => sheet.damage && deleteDamage(sheet.damage.id)}
+                    onClick={async () => {
+                      if (!sheet.damage) return;
+                      if (!confirm("Mark this damage as repaired? It will stop showing on new rentals.")) return;
+                      await markDamageRepaired(sheet.damage.id);
+                      setSheet(null);
+                      onRepaired?.(sheet.damage.id);
+                    }}
                   >
+                    Mark as repaired
+                  </Button>
+                ) : (
+                  <Button variant="danger" size="lg" onClick={() => sheet.damage && deleteDamage(sheet.damage.id)}>
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete damage
                   </Button>
@@ -282,12 +300,9 @@ export default function DamageReport({ existingDamages, boatId: _boatId, damages
           >
             <X className="w-5 h-5 text-white" />
           </button>
-          <img
-            src={lightbox}
-            className="max-w-full max-h-full object-contain"
-            alt=""
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div onClick={(e) => e.stopPropagation()}>
+            <StoredImg path={lightbox} className="max-w-full max-h-full object-contain" />
+          </div>
         </div>
       )}
     </div>
