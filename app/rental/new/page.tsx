@@ -1,11 +1,13 @@
 "use client";
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Rental, RENTAL_TERMS, SAFETY_ITEMS, FUEL_LEVELS, newRental } from "@/lib/types";
 import { saveRental, getRentals, getBoatDamages, getBoats } from "@/lib/storage";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage, isValidEmail, sanitizeFilename } from "@/lib/utils";
 import { readAndCompressImage } from "@/lib/image";
 import { generateRentalPDF } from "@/lib/pdf";
+import { uploadDataUrl } from "@/lib/upload";
+import StoredImg from "@/components/stored-img";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
@@ -34,30 +36,32 @@ export default function RentalWizard() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [signatureDataUrl, setSignatureDataUrl] = useState("");
 
   useEffect(() => {
-  try {
-    const allBoats = getBoats();
+    (async () => {
+      try {
+        const allBoats = await getBoats();
+        const storedRentals = await getRentals();
 
-    const storedRentals = getRentals();
+        const activeBoatIds = new Set(
+          storedRentals
+            .filter(r => r.status === "active")
+            .map(r => r.boatId)
+            .filter(Boolean)
+        );
 
-    const activeBoatIds = new Set(
-      storedRentals
-        .filter(r => r.status === "active")
-        .map(r => r.boatId)
-        .filter(Boolean)
-    );
+        const boatsWithAvailability = allBoats.map(b => ({
+          ...b,
+          available: !activeBoatIds.has(b.id),
+        }));
 
-    const boatsWithAvailability = allBoats.map(b => ({
-      ...b,
-      available: !activeBoatIds.has(b.id),
-    }));
-
-    setBoats(boatsWithAvailability);
-  } catch (error) {
-    alert(getErrorMessage(error));
-  }
-}, []);
+        setBoats(boatsWithAvailability);
+      } catch (error) {
+        alert(getErrorMessage(error));
+      }
+    })();
+  }, []);
 
 
   const update = useCallback((patch: Partial<Rental>) => {
@@ -68,29 +72,37 @@ export default function RentalWizard() {
     setRental(prev => ({ ...prev, safetyChecklist: { ...prev.safetyChecklist, [item]: val } }));
   }, []);
 
-  const boatDamages = useMemo(
-    () => (rental.boatId ? getBoatDamages(rental.boatId) : []),
-    [rental.boatId]
-  );
+  const [boatDamages, setBoatDamages] = useState<import("@/lib/types").Damage[]>([]);
+  const refreshBoatDamages = useCallback(async () => {
+    try { setBoatDamages(rental.boatId ? await getBoatDamages(rental.boatId) : []); }
+    catch (e) { alert(getErrorMessage(e)); }
+  }, [rental.boatId]);
+  useEffect(() => { refreshBoatDamages(); }, [refreshBoatDamages]);
 
   const canNext = (): boolean => {
     switch (step) {
-      case 0: return !!(rental.guestName && rental.guestPhone && isValidEmail(rental.guestEmail) && rental.idPhotoData && (rental.bornBefore1980 || rental.licenceNumber));
+      case 0: return !!(rental.guestName && rental.guestPhone && isValidEmail(rental.guestEmail) && rental.idPhotoPath && (rental.bornBefore1980 || rental.licenceNumber));
       case 1: return !!(rental.boatId && rental.returnDate && rental.returnDate > rental.checkoutDate);
       case 2: return true;
       case 3: return true;
       case 4: return !!(rental.depositAmount && rental.depositReceived);
-      case 5: return !!rental.signatureData;
+      case 5: return !!signatureDataUrl;
       default: return true;
     }
   };
 
-  const complete = () => {
+  const complete = async () => {
     try {
-      const doc = generateRentalPDF(rental, RENTAL_TERMS);
+      let toSave = rental;
+      if (signatureDataUrl) {
+        const signaturePath = await uploadDataUrl(signatureDataUrl, "signatures", `${rental.id}.png`);
+        toSave = { ...rental, signaturePath };
+        setRental(toSave);
+      }
+      const doc = await generateRentalPDF(toSave, RENTAL_TERMS);
       const arrayBuffer = doc.output("arraybuffer");
       const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-      saveRental(rental);
+      await saveRental(toSave);
       setPdfBlob(blob);
       setStep(6);
     } catch (err) {
@@ -164,9 +176,9 @@ export default function RentalWizard() {
         {step === 0 && <StepGuest rental={rental} update={update} />}
         {step === 1 && <StepRental rental={rental} update={update} boats={boats} />}
         {step === 2 && <StepSafety rental={rental} updateChecklist={updateChecklist} />}
-        {step === 3 && <StepCondition rental={rental} update={update} boatDamages={boatDamages} />}
+        {step === 3 && <StepCondition rental={rental} update={update} boatDamages={boatDamages} onRepaired={refreshBoatDamages} />}
         {step === 4 && <StepPayment rental={rental} update={update} />}
-        {step === 5 && <StepSign rental={rental} update={update} terms={RENTAL_TERMS} />}
+        {step === 5 && <StepSign rental={rental} update={update} terms={RENTAL_TERMS} signatureDataUrl={signatureDataUrl} setSignatureDataUrl={setSignatureDataUrl} />}
         {step === 6 && <StepDone rental={rental} downloadPDF={downloadPDF} sendEmail={sendEmail} sending={sending} sent={sent} />}
       </div>
 
@@ -205,11 +217,11 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
       {/* ID Photo Front */}
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-2">ID / Passport Photo — Front *</label>
-        {rental.idPhotoData ? (
+        {rental.idPhotoPath ? (
           <div className="relative rounded-xl overflow-hidden border border-gray-200">
-            <img src={rental.idPhotoData} alt="ID Front" className="w-full h-48 object-cover" />
+            <StoredImg path={rental.idPhotoPath} className="w-full h-48 object-cover" />
             <button
-              onClick={() => update({ idPhotoData: "" })}
+              onClick={() => update({ idPhotoPath: "" })}
               className="absolute top-3 right-3 px-3 py-1.5 bg-black/60 text-white text-sm rounded-lg"
             >
               Retake
@@ -221,7 +233,9 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
             <span className="text-brand font-medium">Tap to photograph ID front</span>
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
               const file = e.target.files?.[0]; if (!file) return;
-              update({ idPhotoData: await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 }) });
+              const dataUrl = await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 });
+              const path = await uploadDataUrl(dataUrl, "id-photos", `${rental.id}/id-front.jpg`);
+              update({ idPhotoPath: path });
             }} />
           </label>
         )}
@@ -230,11 +244,11 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
       {/* ID Photo Back */}
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-2">ID Photo — Back <span className="text-gray-400 font-normal">(optional, recommended for ID cards)</span></label>
-        {rental.idPhotoDataBack ? (
+        {rental.idPhotoBackPath ? (
           <div className="relative rounded-xl overflow-hidden border border-gray-200">
-            <img src={rental.idPhotoDataBack} alt="ID Back" className="w-full h-48 object-cover" />
+            <StoredImg path={rental.idPhotoBackPath} className="w-full h-48 object-cover" />
             <button
-              onClick={() => update({ idPhotoDataBack: "" })}
+              onClick={() => update({ idPhotoBackPath: "" })}
               className="absolute top-3 right-3 px-3 py-1.5 bg-black/60 text-white text-sm rounded-lg"
             >
               Retake
@@ -246,7 +260,9 @@ function StepGuest({ rental, update }: { rental: Rental; update: (p: Partial<Ren
             <span className="text-gray-500 font-medium">Tap to photograph ID back</span>
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
               const file = e.target.files?.[0]; if (!file) return;
-              update({ idPhotoDataBack: await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 }) });
+              const dataUrl = await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 });
+              const path = await uploadDataUrl(dataUrl, "id-photos", `${rental.id}/id-back.jpg`);
+              update({ idPhotoBackPath: path });
             }} />
           </label>
         )}
@@ -353,7 +369,7 @@ function StepSafety({ rental, updateChecklist }: { rental: Rental; updateCheckli
   );
 }
 
-function StepCondition({ rental, update, boatDamages }: { rental: Rental; update: (p: Partial<Rental>) => void; boatDamages: import("@/lib/types").Damage[] }) {
+function StepCondition({ rental, update, boatDamages, onRepaired }: { rental: Rental; update: (p: Partial<Rental>) => void; boatDamages: import("@/lib/types").Damage[]; onRepaired: () => void }) {
   return (
     <div className="space-y-5 pb-24">
       <DamageReport
@@ -361,6 +377,7 @@ function StepCondition({ rental, update, boatDamages }: { rental: Rental; update
         boatId={rental.boatId}
         damages={rental.checkoutDamages}
         onChange={(damages) => update({ checkoutDamages: damages })}
+        onRepaired={onRepaired}
       />
       <Field label="Fuel Level">
         <Select value={rental.checkoutFuel} onChange={e => update({ checkoutFuel: e.target.value })}>
@@ -395,7 +412,7 @@ function StepPayment({ rental, update }: { rental: Rental; update: (p: Partial<R
   );
 }
 
-function StepSign({ rental, update, terms }: { rental: Rental; update: (p: Partial<Rental>) => void; terms: string }) {
+function StepSign({ rental, update, terms, signatureDataUrl, setSignatureDataUrl }: { rental: Rental; update: (p: Partial<Rental>) => void; terms: string; signatureDataUrl: string; setSignatureDataUrl: (v: string) => void }) {
   const [showFullContract, setShowFullContract] = useState(false);
 
   return (
@@ -417,7 +434,7 @@ function StepSign({ rental, update, terms }: { rental: Rental; update: (p: Parti
 
       <div>
         <label className="block text-sm font-medium text-gray-600 mb-2">Guest Signature *</label>
-        <SignaturePad value={rental.signatureData} onChange={sig => update({ signatureData: sig })} />
+        <SignaturePad value={signatureDataUrl} onChange={setSignatureDataUrl} />
       </div>
 
       {showFullContract && (

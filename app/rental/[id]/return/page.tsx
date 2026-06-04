@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getRental, saveRental, getBoatDamages } from "@/lib/storage";
 import { Rental, FUEL_LEVELS } from "@/lib/types";
@@ -23,20 +23,24 @@ export default function ReturnWizard() {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    try {
-      const r = getRental(params.id as string);
-      if (!r || r.status !== "active") { router.push("/"); return; }
-      setRental(r);
-    } catch (error) {
-      alert(getErrorMessage(error));
-      router.push("/");
-    }
+    (async () => {
+      try {
+        const r = await getRental(params.id as string);
+        if (!r || r.status !== "active") { router.push("/"); return; }
+        setRental(r);
+      } catch (error) {
+        alert(getErrorMessage(error));
+        router.push("/");
+      }
+    })();
   }, [params.id, router]);
 
-  const boatDamages = useMemo(
-    () => (rental?.boatId ? getBoatDamages(rental.boatId) : []),
-    [rental?.boatId]
-  );
+  const [boatDamages, setBoatDamages] = useState<import("@/lib/types").Damage[]>([]);
+  const refreshBoatDamages = useCallback(async () => {
+    try { setBoatDamages(rental?.boatId ? await getBoatDamages(rental.boatId) : []); }
+    catch (e) { alert(getErrorMessage(e)); }
+  }, [rental?.boatId]);
+  useEffect(() => { refreshBoatDamages(); }, [refreshBoatDamages]);
 
   if (!rental) return null;
 
@@ -50,12 +54,12 @@ export default function ReturnWizard() {
     }
   };
 
-  const complete = () => {
+  const complete = async () => {
     try {
       const updated = { ...rental, status: "completed" as const, actualReturn: new Date().toISOString() };
-      const doc = generateReturnPDF(updated);
+      const doc = await generateReturnPDF(updated);
       const blob = doc.output("blob");
-      saveRental(updated);
+      await saveRental(updated);
       setRental(updated);
       setPdfBlob(blob);
       setStep(2);
@@ -135,6 +139,7 @@ export default function ReturnWizard() {
               boatId={rental.boatId}
               damages={rental.checkinDamages ?? []}
               onChange={damages => update({ checkinDamages: damages })}
+              onRepaired={refreshBoatDamages}
             />
             <Field label="Fuel Level on Return">
               <Select value={rental.checkinFuel} onChange={e => update({ checkinFuel: e.target.value })}>
