@@ -43,6 +43,7 @@ export async function dataUrlFromPath(fullPath: string): Promise<string> {
   if (!fullPath) return "";
   const url = await getSignedUrl(fullPath, 600);
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`Could not load stored image (HTTP ${res.status}).`);
   const blob = await res.blob();
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -63,6 +64,8 @@ export async function deletePaths(fullPaths: string[]): Promise<void> {
     byBucket.set(bucket, [...(byBucket.get(bucket) ?? []), path]);
   }
   for (const [bucket, paths] of byBucket) {
-    await supabase.storage.from(bucket).remove(paths);
+    const { error } = await supabase.storage.from(bucket).remove(paths);
+    // Best-effort cleanup: a failed delete must not block rental deletion. Surface it for diagnostics.
+    if (error) console.error(`Could not delete files from ${bucket}:`, error.message);
   }
 }
