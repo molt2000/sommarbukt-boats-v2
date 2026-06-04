@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { isValidEmail } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
 
 const MAX_HTML_LENGTH = 20_000;
 const MAX_PDF_BASE64_LENGTH = 8_000_000;
 
 export async function POST(req: NextRequest) {
   try {
-    const expectedToken = process.env.NEXT_PUBLIC_API_TOKEN;
-    if (!expectedToken || req.headers.get("x-api-token") !== expectedToken) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
@@ -42,11 +44,11 @@ export async function POST(req: NextRequest) {
     const safeFilename = sanitizePdfFilename(pdfFilename);
 
     const host = process.env.SMTP_HOST;
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
     const port = Number(process.env.SMTP_PORT) || 587;
 
-    if (!host || !user || !pass) {
+    if (!host || !smtpUser || !smtpPass) {
       return NextResponse.json({ error: "SMTP settings are incomplete." }, { status: 500 });
     }
 
@@ -54,12 +56,12 @@ export async function POST(req: NextRequest) {
       host,
       port,
       secure: port === 465,
-      auth: { user, pass },
+      auth: { user: smtpUser, pass: smtpPass },
       requireTLS: port === 587,
     });
 
     await transporter.sendMail({
-      from: `"Sommarbukt Boats" <${user}>`,
+      from: `"Sommarbukt Boats" <${smtpUser}>`,
       to: recipient,
       subject: mailSubject,
       html: mailHtml,

@@ -1,105 +1,119 @@
-import { getJsonItem, setJsonItem } from "./safe-storage";
-import { Boat, Damage, Rental } from "./types";
+import { createClient } from "@/lib/supabase/client";
+import { rowToBoat, rowToDamage, damageToRow, rowToRental, rentalToRow } from "@/lib/mappers";
+import { deletePaths } from "@/lib/upload";
+import type { Boat, Damage, Rental } from "./types";
 
-const DEFAULT_BOATS: Boat[] = [
-  { id: "1", name: "Tind", available: true },
-  { id: "2", name: "Nordlys", available: true },
-];
-
-export function getBoats(): Boat[] {
-  return getJsonItem<Boat[]>("sb_boats", DEFAULT_BOATS);
+export async function getBoats(): Promise<Boat[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("boats").select("*").order("name");
+  if (error) throw new Error(`Could not load boats: ${error.message}`);
+  return (data ?? []).map(rowToBoat);
 }
 
-function normalizeRental(r: Rental): Rental {
-  return {
-    ...r,
-    checkoutDamages: r.checkoutDamages ?? [],
-    checkinDamages: r.checkinDamages ?? [],
-  };
+/** Active (non-repaired) damages for a boat, used to show history on new rentals. */
+export async function getBoatDamages(boatId: string): Promise<Damage[]> {
+  if (!boatId) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("damages")
+    .select("*")
+    .eq("boat_id", boatId)
+    .is("repaired_at", null)
+    .order("created_at");
+  if (error) throw new Error(`Could not load boat damages: ${error.message}`);
+  return (data ?? []).map(rowToDamage);
 }
 
-const BOAT_DAMAGES_KEY = "sb_boat_damages";
-
-export function getBoatDamages(boatId: string): Damage[] {
-  const all = getJsonItem<Record<string, Damage[]>>(BOAT_DAMAGES_KEY, {});
-  return all[boatId] ?? [];
-}
-
-function mergeBoatDamages(boatId: string, damages: Damage[]): void {
-  if (!boatId || !damages.length) return;
-  const all = getJsonItem<Record<string, Damage[]>>(BOAT_DAMAGES_KEY, {});
-  const existing = all[boatId] ?? [];
-  const existingIds = new Set(existing.map((d) => d.id));
-  const toAdd = damages.filter((d) => !existingIds.has(d.id));
-  if (toAdd.length) {
-    all[boatId] = [...existing, ...toAdd];
-    setJsonItem(BOAT_DAMAGES_KEY, all);
+async function damagesForRental(rentalId: string): Promise<{ checkout: Damage[]; checkin: Damage[] }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("damages")
+    .select("*")
+    .eq("rental_id", rentalId)
+    .order("created_at");
+  if (error) throw new Error(`Could not load damages: ${error.message}`);
+  const checkout: Damage[] = [];
+  const checkin: Damage[] = [];
+  for (const row of data ?? []) {
+    (row.phase === "checkin" ? checkin : checkout).push(rowToDamage(row));
   }
+  return { checkout, checkin };
 }
 
-const KEY = "sommarbukt-rentals";
-
-export function getRentals(): Rental[] {
-  if (typeof window === "undefined") return [];
-
-  const raw = localStorage.getItem(KEY);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error("Stored rental data is not a list.");
-    }
-    return parsed.map(normalizeRental);
-  } catch (error) {
-    console.error("Could not read rentals from localStorage:", error);
-    throw new Error(
-      "Stored rental data is damaged and could not be opened. Please export or inspect the browser data before continuing."
-    );
+export async function getRentals(): Promise<Rental[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("rentals").select("*").order("created_at", { ascending: false });
+  if (error) throw new Error(`Could not load rentals: ${error.message}`);
+  const rentals: Rental[] = [];
+  for (const row of data ?? []) {
+    const { checkout, checkin } = await damagesForRental(row.id);
+    rentals.push(rowToRental(row, checkout, checkin));
   }
+  return rentals;
 }
 
-export function getRental(id: string): Rental | undefined {
-  return getRentals().find(r => r.id === id);
+export async function getRental(id: string): Promise<Rental | undefined> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("rentals").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`Could not load rental: ${error.message}`);
+  if (!data) return undefined;
+  const { checkout, checkin } = await damagesForRental(data.id);
+  return rowToRental(data, checkout, checkin);
 }
 
 /**
- * Enforces: only ONE active rental per boat.
- * If you try to save an ACTIVE rental for a boat that already has another ACTIVE rental,
- * this function throws an Error (caller must handle it).
+ * Saves a rental (upsert) and its damages. The DB partial unique index
+ * `one_active_rental_per_boat` enforces one active rental per boat; a violation
+ * surfaces as a friendly error.
  */
-export function saveRental(rental: Rental) {
-  if (typeof window === "undefined") return;
+export async function saveRental(rental: Rental): Promise<void> {
+  const supabase = createClient();
 
-  const all = getRentals();
-
-  if (rental.status === "active" && rental.boatId) {
-    const conflict = all.find(r =>
-      r.id !== rental.id && r.status === "active" && r.boatId === rental.boatId
-    );
-
-    if (conflict) {
-      throw new Error(
-        `This boat is already out on the water (active rental: ${conflict.id}). Please confirm the return first.`
-      );
+  const { error: rentalError } = await supabase.from("rentals").upsert(rentalToRow(rental));
+  if (rentalError) {
+    if (rentalError.code === "23505") {
+      throw new Error("This boat is already out on the water. Please confirm the return first.");
     }
+    throw new Error(`Could not save rental: ${rentalError.message}`);
   }
 
-  const idx = all.findIndex(r => r.id === rental.id);
-  if (idx >= 0) all[idx] = rental;
-  else all.unshift(rental);
-
-  setJsonItem(KEY, all);
-
-  // Persist all documented damages to the per-boat store
-  mergeBoatDamages(rental.boatId, [
-    ...(rental.checkoutDamages ?? []),
-    ...(rental.checkinDamages ?? []),
-  ]);
+  const rows = [
+    ...rental.checkoutDamages.map((d) => damageToRow(d, rental.id, rental.boatId, "checkout")),
+    ...rental.checkinDamages.map((d) => damageToRow(d, rental.id, rental.boatId, "checkin")),
+  ];
+  if (rows.length) {
+    const { error: dmgError } = await supabase.from("damages").upsert(rows);
+    if (dmgError) throw new Error(`Could not save damages: ${dmgError.message}`);
+  }
 }
 
-export function deleteRental(id: string) {
-  if (typeof window === "undefined") return;
-  const all = getRentals().filter(r => r.id !== id);
-  setJsonItem(KEY, all);
+/** Soft-delete: hides a damage from new rentals but keeps it on its original rental. */
+export async function markDamageRepaired(damageId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("damages")
+    .update({ repaired_at: new Date().toISOString() })
+    .eq("id", damageId);
+  if (error) throw new Error(`Could not mark damage repaired: ${error.message}`);
+}
+
+export async function deleteRental(id: string): Promise<void> {
+  const supabase = createClient();
+
+  const rental = await getRental(id);
+  if (rental) {
+    const photoPaths = [
+      rental.idPhotoPath,
+      rental.idPhotoBackPath,
+      rental.licencePhotoPath,
+      rental.signaturePath,
+      ...rental.checkoutDamages.flatMap((d) => d.photoPaths),
+      ...rental.checkinDamages.flatMap((d) => d.photoPaths),
+    ];
+    await deletePaths(photoPaths);
+  }
+
+  // damages rows are removed via ON DELETE CASCADE
+  const { error } = await supabase.from("rentals").delete().eq("id", id);
+  if (error) throw new Error(`Could not delete rental: ${error.message}`);
 }

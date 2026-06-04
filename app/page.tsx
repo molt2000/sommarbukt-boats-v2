@@ -12,12 +12,18 @@ export default function Dashboard() {
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [search, setSearch] = useState("");
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    try {
-      setRentals(getRentals());
-    } catch (error) {
-      alert(getErrorMessage(error));
-    }
+    (async () => {
+      try {
+        setRentals(await getRentals());
+      } catch (error) {
+        alert(getErrorMessage(error));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const active = rentals.filter(r => r.status === "active");
@@ -28,6 +34,7 @@ export default function Dashboard() {
 
   return (
     <div className="py-8 space-y-8">
+      {loading && <p className="text-center text-gray-400 py-20">Loading…</p>}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -95,7 +102,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {rentals.length === 0 && (
+      {!loading && rentals.length === 0 && (
         <div className="text-center py-20">
           <Ship className="w-16 h-16 text-gray-200 mx-auto mb-4" />
           <p className="text-gray-400 text-lg">No rentals yet</p>

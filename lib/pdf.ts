@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { Damage, Rental } from "./types";
 import { formatDate } from "./utils";
+import { dataUrlFromPath } from "./upload";
 
 const BRAND = [27, 42, 74] as const; // #1B2A4A
 
@@ -12,7 +13,30 @@ const VIEW_LABELS: Record<string, string> = {
   top: "Top view",
 };
 
-export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
+type ResolvedDamage = Damage & { _photos: string[] };
+
+/** Fetches an image as base64; on failure returns "" so a missing/expired image
+ * degrades gracefully instead of aborting the whole PDF. */
+async function safeResolve(path: string): Promise<string> {
+  try {
+    return await dataUrlFromPath(path);
+  } catch (e) {
+    console.error("Could not load image for PDF:", path, e);
+    return "";
+  }
+}
+
+async function resolveDamages(ds: Damage[]): Promise<ResolvedDamage[]> {
+  return Promise.all(
+    ds.map(async (d) => ({ ...d, _photos: await Promise.all(d.photoPaths.map(safeResolve)) }))
+  );
+}
+
+export async function generateRentalPDF(rental: Rental, terms?: string): Promise<jsPDF> {
+  const idFront = await safeResolve(rental.idPhotoPath);
+  const idBack = await safeResolve(rental.idPhotoBackPath);
+  const signature = await safeResolve(rental.signaturePath);
+
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
   let y = 15;
@@ -64,19 +88,19 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   y = row(doc, "Deposit Received", rental.depositReceived ? "Yes" : "No", y);
 
   // ID photo
-  if (rental.idPhotoData || rental.idPhotoDataBack) {
+  if (idFront || idBack) {
     y = checkNewPage(doc, y, 60);
     y += 4;
     y = section(doc, "ID Document", y);
     try {
-      if (rental.idPhotoData) {
-        doc.addImage(rental.idPhotoData, "JPEG", 15, y, 60, 40);
+      if (idFront) {
+        doc.addImage(idFront, "JPEG", 15, y, 60, 40);
         doc.setFontSize(7);
         doc.setTextColor(100, 100, 100);
         doc.text("Front", 15, y + 43);
       }
-      if (rental.idPhotoDataBack) {
-        doc.addImage(rental.idPhotoDataBack, "JPEG", 80, y, 60, 40);
+      if (idBack) {
+        doc.addImage(idBack, "JPEG", 80, y, 60, 40);
         doc.setFontSize(7);
         doc.setTextColor(100, 100, 100);
         doc.text("Back", 80, y + 43);
@@ -87,7 +111,8 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
 
   // Damage documentation
   y += 4;
-  y = damageSection(doc, "Pre-Existing Damage (Hand-Over)", rental.checkoutDamages ?? [], y);
+  const checkoutResolved = await resolveDamages(rental.checkoutDamages ?? []);
+  y = damageSection(doc, "Pre-Existing Damage (Hand-Over)", checkoutResolved, y);
 
   // Terms & Conditions
   const cleanedTerms = (terms ?? "")
@@ -121,9 +146,9 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   doc.text("The guest confirms acceptance of the rental terms, liability waiver, and safety briefing.", 15, y);
   y += 8;
 
-  if (rental.signatureData) {
+  if (signature) {
     try {
-      doc.addImage(rental.signatureData, "PNG", 15, y, 60, 30);
+      doc.addImage(signature, "PNG", 15, y, 60, 30);
       y += 34;
     } catch { y += 4; }
   }
@@ -136,7 +161,7 @@ export function generateRentalPDF(rental: Rental, terms?: string): jsPDF {
   return doc;
 }
 
-export function generateReturnPDF(rental: Rental): jsPDF {
+export async function generateReturnPDF(rental: Rental): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
   let y = 15;
@@ -172,21 +197,24 @@ export function generateReturnPDF(rental: Rental): jsPDF {
   y = row(doc, "Returned", rental.depositReturned ? "Yes" : "No", y);
   if (rental.depositDeduction) y = row(doc, "Deduction", rental.depositDeduction, y);
 
+  const checkoutResolved = await resolveDamages(rental.checkoutDamages ?? []);
+  const checkinResolved = await resolveDamages(rental.checkinDamages ?? []);
+
   // Pre-existing damages (from hand-over) for reference
   if ((rental.checkoutDamages ?? []).length > 0) {
     y += 4;
-    y = damageSection(doc, "Pre-Existing Damage (Hand-Over Reference)", rental.checkoutDamages ?? [], y);
+    y = damageSection(doc, "Pre-Existing Damage (Hand-Over Reference)", checkoutResolved, y);
   }
 
   // New damages found at return
   y += 4;
-  y = damageSection(doc, "New Damage Found at Return", rental.checkinDamages ?? [], y);
+  y = damageSection(doc, "New Damage Found at Return", checkinResolved, y);
 
   footer(doc);
   return doc;
 }
 
-function damageSection(doc: jsPDF, title: string, damages: Damage[], y: number): number {
+function damageSection(doc: jsPDF, title: string, damages: ResolvedDamage[], y: number): number {
   y = section(doc, title, y);
 
   if (damages.length === 0) {
@@ -197,7 +225,7 @@ function damageSection(doc: jsPDF, title: string, damages: Damage[], y: number):
     return y + 8;
   }
 
-  const byView = damages.reduce<Record<string, Damage[]>>((acc, d) => {
+  const byView = damages.reduce<Record<string, ResolvedDamage[]>>((acc, d) => {
     if (!acc[d.view]) acc[d.view] = [];
     acc[d.view].push(d);
     return acc;
@@ -229,9 +257,9 @@ function damageSection(doc: jsPDF, title: string, damages: Damage[], y: number):
         y += lines.length * 4.5 + 2;
       }
 
-      if (d.photos.length > 0) {
+      if (d._photos.length > 0) {
         let col = 0;
-        for (const photo of d.photos) {
+        for (const photo of d._photos) {
           y = checkNewPage(doc, y, 42);
           const x = 20 + col * 50;
           try { doc.addImage(photo, "JPEG", x, y, 45, 30); } catch {}

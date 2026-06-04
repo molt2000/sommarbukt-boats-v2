@@ -1,46 +1,45 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getJsonItem, setJsonItem } from "@/lib/safe-storage";
+import { createClient } from "@/lib/supabase/client";
+import { getBoats } from "@/lib/storage";
 import { getErrorMessage } from "@/lib/utils";
-
-interface Boat {
-  id: string;
-  name: string;
-  registration: string;
-}
-
-const DEFAULT_BOATS: Boat[] = [
-  { id: "1", name: "Tind", registration: "" },
-  { id: "2", name: "Nordlys", registration: "" },
-];
-
-function loadBoats(): Boat[] {
-  if (typeof window === "undefined") return DEFAULT_BOATS;
-  return getJsonItem("sb_boats", DEFAULT_BOATS);
-}
+import type { Boat } from "@/lib/types";
 
 export default function ConfigPage() {
   const router = useRouter();
   const [boats, setBoats] = useState<Boat[]>([]);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      setBoats(loadBoats());
-    } catch (error) {
-      alert(getErrorMessage(error));
-      setBoats(DEFAULT_BOATS);
-    }
+    (async () => {
+      try {
+        setBoats(await getBoats());
+      } catch (error) {
+        alert(getErrorMessage(error));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  function save() {
+  async function save() {
+    if (saving) return;
+    setSaving(true);
     try {
-      setJsonItem("sb_boats", boats);
+      const supabase = createClient();
+      for (const b of boats) {
+        const { error } = await supabase.from("boats").update({ registration: b.registration }).eq("id", b.id);
+        if (error) throw new Error(error.message);
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {
       alert(getErrorMessage(error));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -58,22 +57,26 @@ export default function ConfigPage() {
           <h1 className="text-xl font-bold">Configuration</h1>
           <p className="text-sm text-gray-500">Fleet</p>
         </div>
-        <button onClick={save} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors" style={{ backgroundColor: saved ? "#16a34a" : "#1B2A4A" }}>
-          {saved ? "Saved ✓" : "Save"}
+        <button onClick={save} disabled={saving} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-60" style={{ backgroundColor: saved ? "#16a34a" : "#1B2A4A" }}>
+          {saved ? "Saved ✓" : saving ? "Saving…" : "Save"}
         </button>
       </div>
 
-      <div className="space-y-3">
-        {boats.map(boat => (
-          <div key={boat.id} className="rounded-xl border border-gray-100 p-4">
-            <div className="flex gap-3 items-center">
-              <span className="font-medium text-gray-800 flex-1 py-2">{boat.name}</span>
-              <input className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 focus:outline-none focus:border-brand" value={boat.registration} onChange={e => updateBoat(boat.id, e.target.value)} placeholder="Reg. no." />
+      {loading ? (
+        <p className="text-center text-gray-400 py-20">Loading…</p>
+      ) : (
+        <div className="space-y-3">
+          {boats.map(boat => (
+            <div key={boat.id} className="rounded-xl border border-gray-100 p-4">
+              <div className="flex gap-3 items-center">
+                <span className="font-medium text-gray-800 flex-1 py-2">{boat.name}</span>
+                <input className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 focus:outline-none focus:border-brand" value={boat.registration} onChange={e => updateBoat(boat.id, e.target.value)} placeholder="Reg. no." />
+              </div>
             </div>
-          </div>
-        ))}
-        <p className="text-xs text-gray-400">Edit registration numbers inline. Tap Save when done.</p>
-      </div>
+          ))}
+          <p className="text-xs text-gray-400">Edit registration numbers inline. Tap Save when done.</p>
+        </div>
+      )}
     </div>
   );
 }
