@@ -10,6 +10,7 @@ export default function ConfigPage() {
   const router = useRouter();
   const [boats, setBoats] = useState<Boat[]>([]);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +26,8 @@ export default function ConfigPage() {
   }, []);
 
   async function save() {
+    if (saving) return;
+    setSaving(true);
     try {
       const supabase = createClient();
       for (const b of boats) {
@@ -35,6 +38,8 @@ export default function ConfigPage() {
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {
       alert(getErrorMessage(error));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -52,8 +57,8 @@ export default function ConfigPage() {
           <h1 className="text-xl font-bold">Configuration</h1>
           <p className="text-sm text-gray-500">Fleet</p>
         </div>
-        <button onClick={save} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors" style={{ backgroundColor: saved ? "#16a34a" : "#1B2A4A" }}>
-          {saved ? "Saved ✓" : "Save"}
+        <button onClick={save} disabled={saving} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-60" style={{ backgroundColor: saved ? "#16a34a" : "#1B2A4A" }}>
+          {saved ? "Saved ✓" : saving ? "Saving…" : "Save"}
         </button>
       </div>
 
