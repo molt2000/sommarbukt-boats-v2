@@ -9,12 +9,12 @@ export interface Rental {
   guestEmail: string;
   nationality: string;
   idNumber: string;
-  idPhotoData: string; // base64
-  idPhotoDataBack: string; // base64 - back of ID card
+  idPhotoPath: string;     // Storage path in id-photos bucket
+  idPhotoBackPath: string; // Storage path in id-photos bucket
   passengerCount: number;
   hasLicence: boolean;
   licenceNumber: string;
-  licencePhotoData: string; // base64
+  licencePhotoPath: string; // Storage path in id-photos bucket
   bornBefore1980: boolean;
 
   // Rental
@@ -45,24 +45,26 @@ export interface Rental {
   depositDeduction: string;
 
   // Signature
-  signatureData: string; // base64
+  signaturePath: string; // Storage path in signatures bucket
 }
 
 export interface Damage {
   id: string;
   view: 'stb' | 'bb' | 'front' | 'rear' | 'top';
-  px: number; // position % relative to container
+  px: number;
   py: number;
-  photos: string[]; // base64 or URL
+  photoPaths: string[];      // Storage paths in damage-photos bucket
   desc: string;
-  date: number; // timestamp
+  date: number;              // timestamp
+  repairedAt: string | null; // ISO string when marked repaired, else null
 }
 
 
 export interface Boat {
   id: string;
   name: string;
-  available?: boolean;
+  registration: string;
+  available: boolean;
 }
 
 export const RENTAL_TERMS = `BOAT RENTAL AGREEMENT
@@ -185,7 +187,7 @@ export function newRental(): Rental {
     createdAt: new Date().toISOString(),
     status: "active",
     guestName: "", guestPhone: "", guestEmail: "", nationality: "", idNumber: "",
-    idPhotoData: "", idPhotoDataBack: "", passengerCount: 1, hasLicence: false, licenceNumber: "", licencePhotoData: "",
+    idPhotoPath: "", idPhotoBackPath: "", passengerCount: 1, hasLicence: false, licenceNumber: "", licencePhotoPath: "",
     bornBefore1980: false,
     boatId: "", boatName: "",
     checkoutDate: localNow(), returnDate: "", actualReturn: "",
@@ -195,6 +197,6 @@ export function newRental(): Rental {
     checkinFuel: "",
     rentalFee: "", depositAmount: "", depositReceived: false,
     depositReturned: false, depositDeduction: "",
-    signatureData: "",
+    signaturePath: "",
   };
 }
