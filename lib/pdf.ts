@@ -15,16 +15,27 @@ const VIEW_LABELS: Record<string, string> = {
 
 type ResolvedDamage = Damage & { _photos: string[] };
 
+/** Fetches an image as base64; on failure returns "" so a missing/expired image
+ * degrades gracefully instead of aborting the whole PDF. */
+async function safeResolve(path: string): Promise<string> {
+  try {
+    return await dataUrlFromPath(path);
+  } catch (e) {
+    console.error("Could not load image for PDF:", path, e);
+    return "";
+  }
+}
+
 async function resolveDamages(ds: Damage[]): Promise<ResolvedDamage[]> {
   return Promise.all(
-    ds.map(async (d) => ({ ...d, _photos: await Promise.all(d.photoPaths.map(dataUrlFromPath)) }))
+    ds.map(async (d) => ({ ...d, _photos: await Promise.all(d.photoPaths.map(safeResolve)) }))
   );
 }
 
 export async function generateRentalPDF(rental: Rental, terms?: string): Promise<jsPDF> {
-  const idFront = await dataUrlFromPath(rental.idPhotoPath);
-  const idBack = await dataUrlFromPath(rental.idPhotoBackPath);
-  const signature = await dataUrlFromPath(rental.signaturePath);
+  const idFront = await safeResolve(rental.idPhotoPath);
+  const idBack = await safeResolve(rental.idPhotoBackPath);
+  const signature = await safeResolve(rental.signaturePath);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
