@@ -3,3 +3,6 @@ node_modules
 .env.local
 .env
 out
+*.tsbuildinfo
+dev.log
+sw.js
