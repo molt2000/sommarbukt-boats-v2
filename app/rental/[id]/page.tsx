@@ -50,7 +50,7 @@ export default function RentalDetail() {
       const base64 = await blobToBase64(blob);
       const res = await fetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-token": process.env.NEXT_PUBLIC_API_TOKEN ?? "" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: rental.guestEmail,
           subject: type === "rental"
