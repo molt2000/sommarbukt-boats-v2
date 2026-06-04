@@ -205,8 +205,7 @@ export default function DamageReport({ existingDamages, boatId, damages, onChang
                         const file = e.target.files?.[0];
                         if (!file) return;
                         const dataUrl = await readAndCompressImage(file, { maxSize: 1000, quality: 0.72 });
-                        const idx = sheet.photos.length;
-                        const path = await uploadDataUrl(dataUrl, "damage-photos", `${boatId}/${sheet.damageId}/${idx}.jpg`);
+                        const path = await uploadDataUrl(dataUrl, "damage-photos", `${boatId}/${sheet.damageId}/${crypto.randomUUID()}.jpg`);
                         setSheet((prev) => (prev ? { ...prev, photos: [...prev.photos, path] } : null));
                         e.target.value = "";
                       }}
@@ -246,7 +245,7 @@ export default function DamageReport({ existingDamages, boatId, damages, onChang
                         className="relative rounded-lg overflow-hidden group"
                         onClick={() => setLightbox(p)}
                       >
-                        <StoredImg path={p} className="w-full h-36 object-cover" onClick={() => setLightbox(p)} />
+                        <StoredImg path={p} className="w-full h-36 object-cover" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
                           <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition" />
                         </div>
@@ -264,7 +263,7 @@ export default function DamageReport({ existingDamages, boatId, damages, onChang
                 </p>
                 {isExisting(sheet.damage) ? (
                   <Button
-                    variant="danger"
+                    variant="secondary"
                     size="lg"
                     onClick={async () => {
                       if (!sheet.damage) return;
