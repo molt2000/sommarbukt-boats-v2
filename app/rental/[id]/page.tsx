@@ -6,6 +6,7 @@ import { Rental, RENTAL_TERMS } from "@/lib/types";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage, sanitizeFilename } from "@/lib/utils";
 import { generateRentalPDF, generateReturnPDF } from "@/lib/pdf";
 import Button from "@/components/ui/button";
+import StoredImg from "@/components/stored-img";
 import { ArrowLeft, Ship, User, Shield, Camera, CreditCard, FileSignature, Download, Send, CornerDownRight, Trash2 } from "lucide-react";
 
 export default function RentalDetail() {
@@ -16,25 +17,27 @@ export default function RentalDetail() {
   const [sentType, setSentType] = useState<"rental" | "return" | null>(null);
 
   useEffect(() => {
-    try {
-      const r = getRental(params.id as string);
-      if (!r) { router.push("/"); return; }
-      setRental(r);
-    } catch (error) {
-      alert(getErrorMessage(error));
-      router.push("/");
-    }
+    (async () => {
+      try {
+        const r = await getRental(params.id as string);
+        if (!r) { router.push("/"); return; }
+        setRental(r);
+      } catch (error) {
+        alert(getErrorMessage(error));
+        router.push("/");
+      }
+    })();
   }, [params.id, router]);
 
   if (!rental) return null;
 
-  const downloadRentalPDF = () => {
-    const doc = generateRentalPDF(rental, RENTAL_TERMS);
+  const downloadRentalPDF = async () => {
+    const doc = await generateRentalPDF(rental, RENTAL_TERMS);
     doc.save(`sommarbukt-handover-${sanitizeFilename(rental.guestName)}-${rental.id.slice(0, 8)}.pdf`);
   };
 
-  const downloadReturnPDF = () => {
-    const doc = generateReturnPDF(rental);
+  const downloadReturnPDF = async () => {
+    const doc = await generateReturnPDF(rental);
     doc.save(`sommarbukt-return-${sanitizeFilename(rental.guestName)}-${rental.id.slice(0, 8)}.pdf`);
   };
 
@@ -42,7 +45,7 @@ export default function RentalDetail() {
     if (!rental.guestEmail) return;
     setSending(true);
     try {
-      const doc = type === "rental" ? generateRentalPDF(rental, RENTAL_TERMS) : generateReturnPDF(rental);
+      const doc = type === "rental" ? await generateRentalPDF(rental, RENTAL_TERMS) : await generateReturnPDF(rental);
       const blob = doc.output("blob");
       const base64 = await blobToBase64(blob);
       const res = await fetch("/api/send-email", {
@@ -70,10 +73,10 @@ export default function RentalDetail() {
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm("Delete this rental permanently?")) {
       try {
-        deleteRental(rental.id);
+        await deleteRental(rental.id);
         router.push("/");
       } catch (error) {
         alert(getErrorMessage(error));
@@ -103,10 +106,10 @@ export default function RentalDetail() {
         <Row label="Passengers" value={String(rental.passengerCount)} />
         <Row label="Licence" value={rental.licenceNumber || "None"} />
         <Row label="Born before 1980" value={rental.bornBefore1980 ? "Yes" : "No"} />
-        {(rental.idPhotoData || rental.idPhotoDataBack) && (
+        {(rental.idPhotoPath || rental.idPhotoBackPath) && (
           <div className="flex gap-2 mt-3">
-            {rental.idPhotoData && <img src={rental.idPhotoData} alt="ID Front" className="rounded-lg flex-1 max-w-[48%] object-cover" />}
-            {rental.idPhotoDataBack && <img src={rental.idPhotoDataBack} alt="ID Back" className="rounded-lg flex-1 max-w-[48%] object-cover" />}
+            {rental.idPhotoPath && <StoredImg path={rental.idPhotoPath} className="rounded-lg flex-1 max-w-[48%] object-cover" />}
+            {rental.idPhotoBackPath && <StoredImg path={rental.idPhotoBackPath} className="rounded-lg flex-1 max-w-[48%] object-cover" />}
           </div>
         )}
       </Card>
@@ -141,7 +144,7 @@ export default function RentalDetail() {
       </Card>
 
       <Card icon={<FileSignature className="w-5 h-5" />} title="Signature">
-        {rental.signatureData && <img src={rental.signatureData} alt="Signature" className="h-20 mt-2" />}
+        {rental.signaturePath && <StoredImg path={rental.signaturePath} className="h-20 mt-2" />}
         <div className="mt-2 text-sm text-gray-500">{rental.guestName} — {formatDate(rental.createdAt)}</div>
       </Card>
 
