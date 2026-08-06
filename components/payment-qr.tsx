@@ -1,6 +1,6 @@
 "use client";
 import { QRCodeSVG } from "qrcode.react";
-import { ExternalLink } from "lucide-react";
+import { CreditCard, ExternalLink } from "lucide-react";
 import Button from "@/components/ui/button";
 
 export default function PaymentQR() {
@@ -14,14 +14,21 @@ export default function PaymentQR() {
   }
 
   return (
-    <div className="max-w-sm mx-auto space-y-3 pt-2 border-t border-gray-200">
-      <p className="text-sm text-gray-500 pt-3">Take payment now (optional)</p>
+    <div className="mt-4 p-5 bg-brand/5 border border-brand/20 rounded-xl space-y-4">
+      <div className="flex items-center gap-2 text-brand-dark">
+        <CreditCard className="w-5 h-5" />
+        <span className="font-semibold text-sm">Take payment now (optional)</span>
+      </div>
+      <p className="text-sm text-gray-500 -mt-2">
+        Scan with the guest&apos;s phone, or open the link on this device.
+      </p>
       <div className="flex justify-center">
-        <QRCodeSVG value={url} size={160} />
+        <div className="p-3 bg-white rounded-xl shadow-sm">
+          <QRCodeSVG value={url} size={160} />
+        </div>
       </div>
       <Button
         size="lg"
-        variant="secondary"
         onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
       >
         <ExternalLink className="w-5 h-5 mr-2" /> Open Payment Link
