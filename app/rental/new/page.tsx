@@ -409,6 +409,8 @@ function StepPayment({ rental, update }: { rental: Rental; update: (p: Partial<R
       <div className="space-y-1 mt-4 p-4 bg-gray-50 rounded-xl">
         <Checkbox checked={rental.depositReceived} onChange={v => update({ depositReceived: v })} label="Security deposit received" />
       </div>
+
+      <PaymentQR />
     </div>
   );
 }
@@ -486,8 +488,6 @@ function StepDone({ rental, downloadPDF, sendEmail, sending, sent }: {
           Back to Dashboard
         </Button>
       </div>
-
-      <PaymentQR />
     </div>
   );
 }
