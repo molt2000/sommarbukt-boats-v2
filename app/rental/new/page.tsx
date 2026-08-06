@@ -15,6 +15,7 @@ import Field from "@/components/ui/field";
 import Checkbox from "@/components/ui/checkbox";
 import SignaturePad from "@/components/signature-pad";
 import DamageReport from "@/components/damage-report";
+import PaymentQR from "@/components/payment-qr";
 import { ArrowLeft, ArrowRight, User, Ship, Shield, AlertCircle, CreditCard, FileSignature, Check, Send, Download, Camera } from "lucide-react";
 
 const STEPS = [
@@ -485,6 +486,8 @@ function StepDone({ rental, downloadPDF, sendEmail, sending, sent }: {
           Back to Dashboard
         </Button>
       </div>
+
+      <PaymentQR />
     </div>
   );
 }
