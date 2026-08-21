@@ -13,7 +13,39 @@ const VIEW_LABELS: Record<string, string> = {
   top: "Top view",
 };
 
+const CURRENCY = "NOK";
+
 type ResolvedDamage = Damage & { _photos: string[] };
+
+/** Prefixes a free-text amount with the currency unless one was already typed,
+ * so a bare "500" in a contract is never ambiguous. */
+function amount(value: string): string {
+  const v = (value ?? "").trim();
+  if (!v) return "-";
+  return /[a-z€$£]/i.test(v) ? v : `${CURRENCY} ${v}`;
+}
+
+/** Draws a placeholder box so a failed image load is visible in the document
+ * instead of silently leaving a gap in the evidence. */
+function imagePlaceholder(doc: jsPDF, x: number, y: number, w: number, h: number): void {
+  doc.setDrawColor(200, 200, 200);
+  doc.setFillColor(248, 248, 248);
+  doc.rect(x, y, w, h, "FD");
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
+  doc.text("Photo unavailable", x + w / 2, y + h / 2, { align: "center" });
+  doc.setTextColor(30, 30, 30);
+}
+
+/** Places an image, falling back to a visible placeholder on any failure. */
+function drawImage(doc: jsPDF, data: string, fmt: "JPEG" | "PNG", x: number, y: number, w: number, h: number): void {
+  if (!data) { imagePlaceholder(doc, x, y, w, h); return; }
+  try {
+    doc.addImage(data, fmt, x, y, w, h);
+  } catch {
+    imagePlaceholder(doc, x, y, w, h);
+  }
+}
 
 /** Fetches an image as base64; on failure returns "" so a missing/expired image
  * degrades gracefully instead of aborting the whole PDF. */
@@ -83,30 +115,29 @@ export async function generateRentalPDF(rental: Rental, terms?: string): Promise
 
   y += 4;
   y = section(doc, "Deposit", y);
-  if (rental.rentalFee) y = row(doc, "Rental Fee", rental.rentalFee, y);
-  y = row(doc, "Deposit", rental.depositAmount, y);
+  if (rental.rentalFee) y = row(doc, "Rental Fee", amount(rental.rentalFee), y);
+  y = row(doc, "Deposit", amount(rental.depositAmount), y);
   y = row(doc, "Deposit Received", rental.depositReceived ? "Yes" : "No", y);
 
-  // ID photo
-  if (idFront || idBack) {
+  // ID photo — a recorded-but-unloadable photo still gets a placeholder so the
+  // document shows that one was taken.
+  if (rental.idPhotoPath || rental.idPhotoBackPath) {
     y = checkNewPage(doc, y, 60);
     y += 4;
     y = section(doc, "ID Document", y);
-    try {
-      if (idFront) {
-        doc.addImage(idFront, "JPEG", 15, y, 60, 40);
-        doc.setFontSize(7);
-        doc.setTextColor(100, 100, 100);
-        doc.text("Front", 15, y + 43);
-      }
-      if (idBack) {
-        doc.addImage(idBack, "JPEG", 80, y, 60, 40);
-        doc.setFontSize(7);
-        doc.setTextColor(100, 100, 100);
-        doc.text("Back", 80, y + 43);
-      }
-      y += 48;
-    } catch { y += 4; }
+    if (rental.idPhotoPath) {
+      drawImage(doc, idFront, "JPEG", 15, y, 60, 40);
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Front", 15, y + 43);
+    }
+    if (rental.idPhotoBackPath) {
+      drawImage(doc, idBack, "JPEG", 80, y, 60, 40);
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Back", 80, y + 43);
+    }
+    y += 48;
   }
 
   // Damage documentation
@@ -143,14 +174,37 @@ export async function generateRentalPDF(rental: Rental, terms?: string): Promise
   y = section(doc, "Agreement", y);
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text("The guest confirms acceptance of the rental terms, liability waiver, and safety briefing.", 15, y);
-  y += 8;
 
-  if (signature) {
-    try {
-      doc.addImage(signature, "PNG", 15, y, 60, 30);
-      y += 34;
-    } catch { y += 4; }
+  // Only claim a safety briefing took place if the checklist actually backs it up —
+  // otherwise the document would contradict its own checklist above.
+  const unchecked = Object.entries(rental.safetyChecklist)
+    .filter(([, checked]) => !checked)
+    .map(([item]) => item);
+
+  const confirmation = unchecked.length === 0
+    ? "The guest confirms acceptance of the rental terms, liability waiver, and safety briefing."
+    : "The guest confirms acceptance of the rental terms and liability waiver.";
+  doc.text(confirmation, 15, y);
+  y += 5;
+
+  if (unchecked.length > 0) {
+    doc.setTextColor(150, 60, 60);
+    const note = doc.splitTextToSize(
+      `Not confirmed at hand-over: ${unchecked.join(", ")}.`,
+      180
+    );
+    for (const line of note) {
+      y = checkNewPage(doc, y, 5);
+      doc.text(line, 15, y);
+      y += 4;
+    }
+    doc.setTextColor(30, 30, 30);
+  }
+  y += 4;
+
+  if (rental.signaturePath) {
+    drawImage(doc, signature, "PNG", 15, y, 60, 30);
+    y += 34;
   }
   doc.setFontSize(9);
   doc.setTextColor(30, 30, 30);
@@ -193,9 +247,9 @@ export async function generateReturnPDF(rental: Rental): Promise<jsPDF> {
 
   y += 4;
   y = section(doc, "Deposit Resolution", y);
-  y = row(doc, "Deposit Amount", rental.depositAmount, y);
+  y = row(doc, "Deposit Amount", amount(rental.depositAmount), y);
   y = row(doc, "Returned", rental.depositReturned ? "Yes" : "No", y);
-  if (rental.depositDeduction) y = row(doc, "Deduction", rental.depositDeduction, y);
+  if (rental.depositDeduction) y = row(doc, "Deduction", amount(rental.depositDeduction), y);
 
   const checkoutResolved = await resolveDamages(rental.checkoutDamages ?? []);
   const checkinResolved = await resolveDamages(rental.checkinDamages ?? []);
@@ -260,9 +314,11 @@ function damageSection(doc: jsPDF, title: string, damages: ResolvedDamage[], y: 
       if (d._photos.length > 0) {
         let col = 0;
         for (const photo of d._photos) {
-          y = checkNewPage(doc, y, 42);
-          const x = 20 + col * 50;
-          try { doc.addImage(photo, "JPEG", x, y, 45, 30); } catch {}
+          const wrapped = checkNewPage(doc, y, 42);
+          // A page break restarts the row, so the next photo must start in column 1.
+          if (wrapped !== y) col = 0;
+          y = wrapped;
+          drawImage(doc, photo, "JPEG", 20 + col * 50, y, 45, 30);
           col++;
           if (col >= 3) { col = 0; y += 34; }
         }
@@ -313,6 +369,8 @@ function footer(doc: jsPDF): void {
     doc.setPage(i);
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
-    doc.text("Sommarbukt - 9030 Sjursnes, Troms, Norway - sommarbukt.com", w / 2, 290, { align: "center" });
+    doc.text("Sommarbukt - 9030 Sjursnes, Troms, Norway - hello@sommarbukt.no", w / 2, 290, { align: "center" });
+    // Page numbers make it provable that a multi-page contract is complete.
+    doc.text(`Page ${i} of ${pages}`, w - 15, 290, { align: "right" });
   }
 }
