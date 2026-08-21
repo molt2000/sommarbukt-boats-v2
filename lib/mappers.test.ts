@@ -51,6 +51,7 @@ describe("rental <-> row", () => {
     checkoutFuel: "Full", checkinFuel: "",
     rentalFee: "3100 NOK", depositAmount: "5000 NOK", depositReceived: true,
     depositReturned: false, depositDeduction: "", signaturePath: "signatures/r1.png",
+    returnSignaturePath: "signatures/r1-return.png",
   };
   it("rentalToRow groups guest/payment and excludes damages", () => {
     const row = rentalToRow(rental);
@@ -67,7 +68,12 @@ describe("rental <-> row", () => {
       depositReturned: false, depositDeduction: "",
     });
     expect(row.signature_path).toBe("signatures/r1.png");
+    expect(row.return_signature_path).toBe("signatures/r1-return.png");
     expect("checkoutDamages" in row).toBe(false);
+  });
+  it("rowToRental defaults a missing return signature to empty (pre-existing rows)", () => {
+    const row = { ...rentalToRow(rental), return_signature_path: null };
+    expect(rowToRental(row, [], []).returnSignaturePath).toBe("");
   });
   it("rowToRental rebuilds the flat Rental (damages injected separately)", () => {
     const row = rentalToRow(rental);

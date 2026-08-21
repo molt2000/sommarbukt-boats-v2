@@ -264,6 +264,35 @@ export async function generateReturnPDF(rental: Rental): Promise<jsPDF> {
   y += 4;
   y = damageSection(doc, "New Damage Found at Return", checkinResolved, y);
 
+  // Countersignature: turns the report from our own assertion into a mutual
+  // record of the condition and of the deposit being settled.
+  y = checkNewPage(doc, y, 50);
+  y += 4;
+  y = section(doc, "Acknowledgement", y);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  const ack = doc.splitTextToSize(
+    "The guest confirms the return condition documented above and acknowledges that the security deposit has been settled as stated.",
+    180
+  );
+  for (const line of ack) {
+    y = checkNewPage(doc, y, 5);
+    doc.text(line, 15, y);
+    y += 4;
+  }
+  y += 5;
+
+  if (rental.returnSignaturePath) {
+    const returnSignature = await safeResolve(rental.returnSignaturePath);
+    y = checkNewPage(doc, y, 40);
+    drawImage(doc, returnSignature, "PNG", 15, y, 60, 30);
+    y += 34;
+  }
+  doc.setFontSize(9);
+  doc.setTextColor(30, 30, 30);
+  doc.text(rental.guestName, 15, y);
+  doc.text(formatDate(rental.actualReturn || new Date().toISOString()), 80, y);
+
   footer(doc);
   return doc;
 }

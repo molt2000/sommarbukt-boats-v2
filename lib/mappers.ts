@@ -60,6 +60,7 @@ export function rentalToRow(r: Rental) {
     id_photo_back_path: r.idPhotoBackPath || null,
     licence_photo_path: r.licencePhotoPath || null,
     signature_path: r.signaturePath || null,
+    return_signature_path: r.returnSignaturePath || null,
     boat_id: r.boatId || null,
     boat_name: r.boatName,
     checkout_date: r.checkoutDate || null,
@@ -113,5 +114,6 @@ export function rowToRental(row: any, checkoutDamages: Damage[], checkinDamages:
     depositReturned: p.depositReturned ?? false,
     depositDeduction: p.depositDeduction ?? "",
     signaturePath: row.signature_path ?? "",
+    returnSignaturePath: row.return_signature_path ?? "",
   };
 }

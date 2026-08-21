@@ -45,7 +45,8 @@ export interface Rental {
   depositDeduction: string;
 
   // Signature
-  signaturePath: string; // Storage path in signatures bucket
+  signaturePath: string;       // Storage path in signatures bucket (hand-over)
+  returnSignaturePath: string; // Storage path in signatures bucket (return)
 }
 
 export interface Damage {
@@ -197,6 +198,6 @@ export function newRental(): Rental {
     checkinFuel: "",
     rentalFee: "", depositAmount: "", depositReceived: false,
     depositReturned: false, depositDeduction: "",
-    signaturePath: "",
+    signaturePath: "", returnSignaturePath: "",
   };
 }
