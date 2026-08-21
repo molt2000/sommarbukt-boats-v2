@@ -5,14 +5,12 @@ import { getRental, saveRental, getBoatDamages } from "@/lib/storage";
 import { Rental, FUEL_LEVELS } from "@/lib/types";
 import { blobToBase64, escapeHtml, formatDate, getErrorMessage, sanitizeFilename } from "@/lib/utils";
 import { generateReturnPDF } from "@/lib/pdf";
-import { uploadDataUrl } from "@/lib/upload";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import Field from "@/components/ui/field";
 import Checkbox from "@/components/ui/checkbox";
 import DamageReport from "@/components/damage-report";
-import SignaturePad from "@/components/signature-pad";
 import { ArrowLeft, ArrowRight, CheckCircle, Check, Download, Send } from "lucide-react";
 
 export default function ReturnWizard() {
@@ -23,7 +21,6 @@ export default function ReturnWizard() {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [signatureDataUrl, setSignatureDataUrl] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -53,27 +50,19 @@ export default function ReturnWizard() {
     switch (step) {
       case 0: return !!rental.checkinFuel;
       case 1: return rental.depositReturned || !!rental.depositDeduction;
-      case 2: return !!signatureDataUrl;
       default: return true;
     }
   };
 
   const complete = async () => {
     try {
-      // Upload first so the path is part of the record the PDF is rendered from.
-      const returnSignaturePath = await uploadDataUrl(signatureDataUrl, "signatures", `${rental.id}-return.png`);
-      const updated = {
-        ...rental,
-        status: "completed" as const,
-        actualReturn: new Date().toISOString(),
-        returnSignaturePath,
-      };
+      const updated = { ...rental, status: "completed" as const, actualReturn: new Date().toISOString() };
       const doc = await generateReturnPDF(updated);
       const blob = doc.output("blob");
       await saveRental(updated);
       setRental(updated);
       setPdfBlob(blob);
-      setStep(3);
+      setStep(2);
     } catch (error) {
       alert(getErrorMessage(error));
     }
@@ -123,20 +112,20 @@ export default function ReturnWizard() {
     <div className="py-6">
       <div className="flex items-center gap-3 mb-6">
         <button
-          onClick={() => step === 0 ? router.back() : step === 3 ? router.push(`/rental/${params.id}`) : setStep(s => s - 1)}
+          onClick={() => step === 0 ? router.back() : step === 2 ? router.push(`/rental/${params.id}`) : setStep(s => s - 1)}
           className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
           <h1 className="text-xl font-bold">Return — {rental.guestName}</h1>
-          {step < 3 && <p className="text-sm text-gray-500">Step {step + 1} of 3</p>}
+          {step < 2 && <p className="text-sm text-gray-500">Step {step + 1} of 2</p>}
         </div>
       </div>
 
-      {step < 3 && (
+      {step < 2 && (
         <div className="flex gap-1.5 mb-8">
-          {[0, 1, 2].map(i => (
+          {[0, 1].map(i => (
             <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-brand" : "bg-gray-200"}`} />
           ))}
         </div>
@@ -187,40 +176,6 @@ export default function ReturnWizard() {
         )}
 
         {step === 2 && (
-          <div className="space-y-5 pb-24">
-            <p className="text-sm text-gray-500">
-              Have the guest confirm the return and the deposit settlement.
-            </p>
-
-            <div className="p-4 bg-gray-50 rounded-xl space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Deposit held</span>
-                <span className="font-medium">{rental.depositAmount || "—"}</span>
-              </div>
-              {rental.depositDeduction && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Deduction</span>
-                  <span className="font-medium text-amber-700">{rental.depositDeduction}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-500">Returned to guest</span>
-                <span className="font-medium">{rental.depositReturned ? "Yes" : "No"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">New damage</span>
-                <span className="font-medium">{hasDamage ? `${(rental.checkinDamages ?? []).length} documented` : "None"}</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Guest Signature *</label>
-              <SignaturePad value={signatureDataUrl} onChange={setSignatureDataUrl} />
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
           <div className="text-center py-8 space-y-6">
             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
               <CheckCircle className="w-10 h-10 text-green-600" />
@@ -243,7 +198,7 @@ export default function ReturnWizard() {
         )}
       </div>
 
-      {step < 3 && (
+      {step < 2 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4">
           <div className="max-w-3xl mx-auto flex gap-3">
             {step > 0 && (
@@ -251,8 +206,8 @@ export default function ReturnWizard() {
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back
               </Button>
             )}
-            {step < 2 ? (
-              <Button size="lg" onClick={() => setStep(s => s + 1)} disabled={!canNext()} className="flex-1 w-auto">
+            {step < 1 ? (
+              <Button size="lg" onClick={() => setStep(1)} disabled={!canNext()} className="flex-1 w-auto">
                 Next <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
